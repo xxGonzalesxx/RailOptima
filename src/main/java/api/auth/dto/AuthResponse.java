@@ -1,4 +1,10 @@
 package api.auth.dto;
 
-public class AuthResponse {
-}
+import java.util.UUID;
+
+public record AuthResponse(
+        String token,
+        UUID userId,
+        String email,
+        String role
+) {}

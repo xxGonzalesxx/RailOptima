@@ -1,4 +1,4 @@
-package api.auth.security.model;
+package api.auth.model;
 
 public enum Role {
 

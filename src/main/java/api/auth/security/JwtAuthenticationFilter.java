@@ -1,6 +1,5 @@
-package api.auth.security.security;
+package api.auth.security;
 
-import api.auth.security.JwtTokenProvider;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
