@@ -1,4 +1,7 @@
 package api.project.model;
 
-public class ProjectStatus {
+public enum ProjectStatus {
+    CREATED,
+    IN_PROGRESS,
+    COMPLETED
 }
