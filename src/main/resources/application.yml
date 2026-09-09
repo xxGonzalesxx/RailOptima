@@ -1,10 +1,28 @@
+server:
+  port: 8080
+
 spring:
   application:
     name: railoptima
 
-server:
-  port: 8080
+  # 1. Настройки подключения к PostgreSQL (Infrastructure)
+  datasource:
+    url: jdbc:postgresql://localhost:5432/railoptima
+    username: railuser
+    password: railpassword
+    driver-class-name: org.postgresql.Driver
 
+  # 2. Настройки ORM (JPA/Hibernate)
+  jpa:
+    hibernate:
+      ddl-auto: update # При переходе на микросервисы заменим на Liquibase/Flyway
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+# 3. Мониторинг и Health-checks (Production readiness)
 management:
   endpoints:
     web:
@@ -16,6 +34,7 @@ management:
     info:
       enabled: true
 
+# 4. Метаданные о сервисе (Удобно для Service Discovery / Spring Boot Admin)
 info:
   app:
     name: RailOptima API
@@ -24,3 +43,12 @@ info:
       version: 25
     spring:
       version: 4.1.1
+
+# 5. Кастомные бизнес-свойства (Security)
+jwt:
+  secret: "your-super-safe-and-very-long-secret-key-structure-for-railoptima-2026"
+  expiration: 86400000 # 24 часа
+
+app:
+  cors:
+    allowed-origins: "*"
