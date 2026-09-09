@@ -10,6 +10,6 @@ public record RegisterRequest(
         String email,
 
         @NotBlank(message = "Пароль не может быть пустым")
-        @Size(min = 6, message = "Пароль должен содержать от 6 до 100 символов")
+        @Size(min = 6, max = 100, message = "Пароль должен содержать от 6 до 100 символов")
         String password
 ) {}
