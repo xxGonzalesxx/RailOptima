@@ -1,6 +1,8 @@
 package api.project.dto;
 
+import api.project.model.ProjectStatus;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 public record ProjectUpdateRequest(
@@ -11,6 +13,6 @@ public record ProjectUpdateRequest(
         @Size(max = 500, message = "Описание проекта не должно превышать 500 символов")
         String description,
 
-        @NotBlank(message = "Статус проекта не может быть пустым")
-        String status // Например: CREATED, IN_PROGRESS, COMPLETED
+        @NotNull(message = "Статус проекта не может быть пустым")
+        ProjectStatus status
 ) {}
