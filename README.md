@@ -62,37 +62,44 @@
 ---
 
 ## Архитектура
+```
 RailOptima/
 ├── Config/
-│ ├── DefaultEngine.ini
-│ ├── DefaultGame.ini
-│ └── DefaultInput.ini
-├── Content/ # Ассеты UE (.uasset, .umap) — в Git LFS
-├── RawContent/ # Исходники (PNG-карты, GeoTIFF) — в Git LFS
+│   ├── DefaultEngine.ini
+│   ├── DefaultGame.ini
+│   └── DefaultInput.ini
+├── Content/
+├── RawContent/
 ├── Source/
-│ ├── RailOptima.Target.cs
-│ ├── RailOptimaEditor.Target.cs
-│ └── RailOptima/
-│ ├── Core/
-│ │ ├── MapLoader.h/.cpp # Загрузка 16-бит PNG через ImageWrapper
-│ │ ├── TerrainGenerator.h/.cpp # Генерация Landscape
-│ │ ├── GroundMapSystem.h/.cpp # Типы грунтов и кисть
-│ │ └── HeightInterpolator.h/.cpp # Билинейная интерполяция
-│ ├── Algorithms/
-│ │ ├── AStarPathFinder.h/.cpp # A* с приоритетной очередью
-│ │ ├── CostCalculator.h/.cpp # Формула стоимости
-│ │ └── BezierCurve.h/.cpp # Сглаживание сплайнами
-│ ├── Services/
-│ │ ├── ExcelExporter.h/.cpp # libxlsxwriter
-│ │ └── ApiClient.h/.cpp # HTTP + JSON
-│ ├── UI/
-│ │ ├── MainMenuWidget.h/.cpp
-│ │ └── GroundPaletteWidget.h/.cpp
-│ ├── RailOptimaGameMode.h/.cpp
-│ ├── RailOptima.Build.cs
-│ ├── RailOptima.cpp
-│ └── RailOptima.h
+│   ├── RailOptima.Target.cs
+│   ├── RailOptimaEditor.Target.cs
+│   ├── RailOptima/
+│   │   ├── Core/
+│   │   │   ├── MapLoader.h / .cpp
+│   │   │   ├── HeightInterpolator.h / .cpp
+│   │   │   ├── TerrainGenerator.h / .cpp
+│   │   │   └── GroundMapSystem.h / .cpp
+│   │   ├── Algorithms/
+│   │   │   ├── CostCalculator.h / .cpp
+│   │   │   ├── AStarPathFinder.h / .cpp
+│   │   │   └── BezierCurve.h / .cpp
+│   │   ├── Services/
+│   │   │   ├── ExcelExporter.h / .cpp
+│   │   │   └── ApiClient.h / .cpp
+│   │   ├── UI/
+│   │   │   ├── MainMenuWidget.h / .cpp
+│   │   │   └── GroundPaletteWidget.h / .cpp
+│   │   ├── RailOptimaGameMode.h / .cpp
+│   │   ├── RailOptima.Build.cs
+│   │   ├── RailOptima.cpp
+│   │   └── RailOptima.h
+│   └── ThirdParty/
+│       └── xlsxwriter/
+│           ├── include/
+│           ├── lib/
+│           └── xlsxwriter.Build.cs
 └── RailOptima.uproject
+```
 
 
 ---
