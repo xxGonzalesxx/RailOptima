@@ -34,3 +34,182 @@
 - Построение сетки узлов с шагом 50–100 метров.
 - Алгоритм A* с весом ребра, равным стоимости строительства, а не длине.
 - Формула стоимости ребра:
+Стоимость = Длина × (1 + |Уклон| × 0.1) × Коэф_грунта
+× (1 + 0.5 × (Угол_поворота / 90)²)
+
+
+- Запретные зоны: обход городов, заповедников, болот.
+- Сглаживание маршрута сплайнами Безье.
+- Цветовая визуализация маршрута: красный — дорого, зелёный — дёшево.
+- Профиль высот вдоль маршрута.
+- Экспорт отчёта в Excel: длина, стоимость по участкам, общая цена.
+- Интеграция с веб-платформой через REST API (JSON).
+- Билинейная интерполяция высот для точного расчёта уклонов.
+
+---
+
+## Стек
+
+| Слой                | Технология                                  |
+|---------------------|---------------------------------------------|
+| Движок              | Unreal Engine 5 (последняя стабильная)      |
+| Логика              | C++ (вся бизнес-логика)                     |
+| UI                  | UMG (Blueprint-виджеты + C++ через BindWidget) |
+| Модули UE           | ImageWrapper, HTTP, Json, JsonUtilities, UMG, Slate, SlateCore, Landscape |
+| Сторонние библиотеки| libxlsxwriter, nlohmann/json                |
+| Сборка              | Visual Studio 2022 / Rider for Unreal Engine|
+
+---
+
+## Архитектура
+RailOptima/
+├── Config/
+│ ├── DefaultEngine.ini
+│ ├── DefaultGame.ini
+│ └── DefaultInput.ini
+├── Content/ # Ассеты UE (.uasset, .umap) — в Git LFS
+├── RawContent/ # Исходники (PNG-карты, GeoTIFF) — в Git LFS
+├── Source/
+│ ├── RailOptima.Target.cs
+│ ├── RailOptimaEditor.Target.cs
+│ └── RailOptima/
+│ ├── Core/
+│ │ ├── MapLoader.h/.cpp # Загрузка 16-бит PNG через ImageWrapper
+│ │ ├── TerrainGenerator.h/.cpp # Генерация Landscape
+│ │ ├── GroundMapSystem.h/.cpp # Типы грунтов и кисть
+│ │ └── HeightInterpolator.h/.cpp # Билинейная интерполяция
+│ ├── Algorithms/
+│ │ ├── AStarPathFinder.h/.cpp # A* с приоритетной очередью
+│ │ ├── CostCalculator.h/.cpp # Формула стоимости
+│ │ └── BezierCurve.h/.cpp # Сглаживание сплайнами
+│ ├── Services/
+│ │ ├── ExcelExporter.h/.cpp # libxlsxwriter
+│ │ └── ApiClient.h/.cpp # HTTP + JSON
+│ ├── UI/
+│ │ ├── MainMenuWidget.h/.cpp
+│ │ └── GroundPaletteWidget.h/.cpp
+│ ├── RailOptimaGameMode.h/.cpp
+│ ├── RailOptima.Build.cs
+│ ├── RailOptima.cpp
+│ └── RailOptima.h
+└── RailOptima.uproject
+
+
+---
+
+## Требования
+
+- **Unreal Engine 5** (последняя стабильная версия).
+- **Visual Studio 2022** с workload «Game development with C++» либо
+  **Rider for Unreal Engine**.
+- **Git LFS** — обязательно, репозиторий использует LFS для бинарных ассетов.
+- **GDAL** (утилита `gdal_translate`) — только для подготовки карт высот.
+- Windows 10/11 x64 (основная платформа).
+
+---
+
+## Сборка
+
+1. Клонировать репозиторий с LFS:
+
+   ```bash
+   git clone <repo-url> RailOptima
+   cd RailOptima
+   git lfs pull
+    ```
+
+2. Сгенерировать проектные файлы:
+    - ПКМ по RailOptima.uproject → Generate Visual Studio project files.
+    - Либо из командной строки:
+    ```bash
+        "C:\Program Files\Epic Games\UE_5.x\Engine\Build\BatchFiles\GenerateProjectFiles.bat" -project="%CD%\RailOptima.uproject" -game
+    ```
+
+3. Открыть RailOptima.sln в Visual Studio 2022.
+
+4. Собрать конфигурацию Development Editor и платформу Win64.
+
+5. Запустить редактор из IDE либо двойным кликом по RailOptima.uproject.
+
+## Live Coding
+При итерациях по C++ используем Live Coding (Ctrl + Alt + F11), чтобы
+не перезапускать редактор. Полная пересборка нужна только при правках
+Build.cs, Target.cs или заголовочных файлов с UCLASS/USTRUCT.
+
+## Источники данных
+- OpenStreetMap — 2D-геометрия: дороги, реки, границы городов,
+заповедники.
+
+- OpenTopography API — GeoTIFF с высотами (SRTM 30 м, Copernicus 30 м).
+
+- Конвертация GeoTIFF → 16-бит PNG через gdal_translate:
+```bash
+gdal_translate -of PNG -ot UInt16 -scale <src.tif> <dst.png>
+```
+
+- Valhalla (опционально) — уточнение высот вдоль маршрута через /height.
+
+## Структура репозитория
+| Директория     | Назначение                                              |
+|----------------|---------------------------------------------------------|
+| `Config/`      | Конфиги проекта (`DefaultEngine.ini` и др.).            |
+| `Content/`     | Ассеты UE (`.uasset`, `.umap`). Хранится в LFS.         |
+| `RawContent/`  | Исходные карты, GeoTIFF, PNG. Хранится в LFS.           |
+| `Source/`      | Исходный код C++.                                       |
+| `Exports/`     | Отчёты Excel, JSON-выгрузки. Игнорируется Git.          |
+| `Binaries/`    | Бинарники сборки. Игнорируется Git.                     |
+| `Intermediate/`| Промежуточные файлы сборки. Игнорируется Git.           |
+| `Saved/`       | Логи, кэш, сохранения. Игнорируется Git.                |
+
+## Git LFS
+Репозиторий использует Git LFS для бинарных файлов. Отслеживаются:
+
+- Ассеты Unreal: *.uasset, *.umap.
+
+- Изображения: *.png, *.jpg, *.tga, *.psd, *.exr, *.hdr.
+
+- 3D-модели: *.fbx, *.obj, *.blend.
+
+- Карты высот: *.geotiff, *.tif, *.tiff.
+
+- Аудио и видео: *.wav, *.mp3, *.ogg, *.mp4.
+
+Установка LFS перед первым клоном:
+
+```bash
+git lfs install
+```
+
+Проверка отслеживаемых файлов:
+```bash
+git lfs ls-files
+```
+
+## Статус проекта
+Дипломный проект. Разработка ведётся по плану из 12 недель:
+| Недели | Этап                                                | Статус   |
+|--------|-----------------------------------------------------|----------|
+| 1–2    | Инфраструктура, MapLoader, HeightInterpolator       | В работе |
+| 3–4    | Ландшафт, импорт PNG, карта грунтов                 | План     |
+| 5–6    | CostCalculator, AStarPathFinder, оптимизация        | План     |
+| 7–8    | Кисть, палитра, точки старта/финиша, рендер         | План     |
+| 9–10   | ExcelExporter, ApiClient, тестирование              | План     |
+| 11–12  | Оптимизация, сборка, демо, пояснительная записка    | План     |
+
+## Критерии успеха
+- Время расчёта маршрута на карте 512×512 — менее 1 секунды.
+
+- Маршрут длиннее прямого, но дешевле (обход болот и гор).
+
+- Интерфейс: три кнопки и мышь, без обучения.
+
+- Экспорт в Excel работает без ошибок.
+
+- Интеграция с сайтом/ботом через HTTP.
+
+- Вес итогового билда 500 МБ – 1 ГБ.
+
+
+## Лицензия
+Проект создан в учебных целях. Лицензия будет определена после защиты
+дипломной работы.

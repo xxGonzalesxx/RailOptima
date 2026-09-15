@@ -91,3 +91,15 @@ Session.vim
 # Экспортированные данные (Excel-отчёты, JSON для API)
 /Exports/
 *.xlsx
+
+# ============================================================
+# ThirdParty: игнорируем собранные библиотеки, но не заголовки
+# ============================================================
+/Source/ThirdParty/**/lib/
+/Source/ThirdParty/**/bin/
+/Source/ThirdParty/**/build/
+*.lib
+*.dll
+*.so
+*.dylib
+*.a
