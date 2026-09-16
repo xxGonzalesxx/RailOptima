@@ -62,44 +62,53 @@
 ---
 
 ## Архитектура
-```
 RailOptima/
-├── Config/
+│
+├── Config/                              # Конфиги проекта
 │   ├── DefaultEngine.ini
 │   ├── DefaultGame.ini
 │   └── DefaultInput.ini
-├── Content/
-├── RawContent/
+│
+├── Content/                             # Ассеты UE (.uasset, .umap) — в Git LFS
+│
+├── RawContent/                          # Исходники (PNG-карты, GeoTIFF) — в Git LFS
+│
 ├── Source/
 │   ├── RailOptima.Target.cs
 │   ├── RailOptimaEditor.Target.cs
+│   │
 │   ├── RailOptima/
-│   │   ├── Core/
-│   │   │   ├── MapLoader.h / .cpp
-│   │   │   ├── HeightInterpolator.h / .cpp
-│   │   │   ├── TerrainGenerator.h / .cpp
-│   │   │   └── GroundMapSystem.h / .cpp
-│   │   ├── Algorithms/
-│   │   │   ├── CostCalculator.h / .cpp
-│   │   │   ├── AStarPathFinder.h / .cpp
-│   │   │   └── BezierCurve.h / .cpp
-│   │   ├── Services/
-│   │   │   ├── ExcelExporter.h / .cpp
-│   │   │   └── ApiClient.h / .cpp
-│   │   ├── UI/
+│   │   ├── Core/                        # Загрузка данных, рельеф, грунты
+│   │   │   ├── MapLoader.h / .cpp           # Загрузка 16-бит PNG через ImageWrapper
+│   │   │   ├── HeightInterpolator.h / .cpp  # Билинейная интерполяция высот
+│   │   │   ├── TerrainGenerator.h / .cpp    # Генерация Landscape
+│   │   │   └── GroundMapSystem.h / .cpp     # Типы грунтов и кисть
+│   │   │
+│   │   ├── Algorithms/                  # Ядро расчёта маршрута
+│   │   │   ├── CostCalculator.h / .cpp      # Формула стоимости ребра
+│   │   │   ├── AStarPathFinder.h / .cpp     # A* с приоритетной очередью
+│   │   │   └── BezierCurve.h / .cpp         # Сглаживание сплайнами Безье
+│   │   │
+│   │   ├── Services/                    # Внешние интеграции
+│   │   │   ├── ExcelExporter.h / .cpp       # Экспорт отчёта (libxlsxwriter)
+│   │   │   └── ApiClient.h / .cpp           # HTTP + JSON для веб-платформы
+│   │   │
+│   │   ├── UI/                          # Виджеты UMG
 │   │   │   ├── MainMenuWidget.h / .cpp
 │   │   │   └── GroundPaletteWidget.h / .cpp
+│   │   │
 │   │   ├── RailOptimaGameMode.h / .cpp
 │   │   ├── RailOptima.Build.cs
 │   │   ├── RailOptima.cpp
 │   │   └── RailOptima.h
-│   └── ThirdParty/
+│   │
+│   └── ThirdParty/                      # Сторонние библиотеки
 │       └── xlsxwriter/
-│           ├── include/
-│           ├── lib/
+│           ├── include/                     # Заголовки libxlsxwriter + zlib
+│           ├── lib/                         # .lib собираются локально, не в Git
 │           └── xlsxwriter.Build.cs
+│
 └── RailOptima.uproject
-```
 
 
 ---
