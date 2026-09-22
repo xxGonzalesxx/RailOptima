@@ -3,7 +3,7 @@ package api.common.constant;
 public final class ApiConstants {
 
     private ApiConstants() {
-        throw new UnsupportedOperationException("This is a utility class and cannot be instantiated");
+        throw new UnsupportedOperationException("Это утилитный класс, его нельзя создавать");
     }
 
     // Базовые пути
@@ -17,8 +17,8 @@ public final class ApiConstants {
     public static final int DEFAULT_PAGE_SIZE = 20;
     public static final int MAX_PAGE_SIZE = 100;
 
-    // Сообщения
-    public static final String MSG_SUCCESS = "Operation completed successfully";
-    public static final String MSG_UNAUTHORIZED = "Unauthorized access";
-    public static final String MSG_FORBIDDEN = "Access denied";
+    // Сообщения — теперь на русском
+    public static final String MSG_SUCCESS = "Операция успешно завершена";
+    public static final String MSG_UNAUTHORIZED = "Необходима авторизация";
+    public static final String MSG_FORBIDDEN = "Доступ запрещён";
 }
