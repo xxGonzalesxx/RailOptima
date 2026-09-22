@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -42,9 +43,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Map<String, String>>> handleMethodArgumentNotValid(MethodArgumentNotValidException ex, HttpServletRequest request) {
         Map<String, String> errors = new HashMap<>();
         ex.getBindingResult().getAllErrors().forEach(error -> {
-            String fieldName = ((FieldError) error).getField();
-            String errorMessage = error.getDefaultMessage();
-            errors.put(fieldName, errorMessage);
+            if (error instanceof FieldError fieldError) {
+                errors.put(fieldError.getField(), fieldError.getDefaultMessage());
+            } else {
+                errors.put("global", error.getDefaultMessage());
+            }
         });
 
         log.warn("Spring validation failed on path {}: {}", request.getRequestURI(), errors);
@@ -103,5 +106,17 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
         return ResponseEntity.status(status).body(response);
+    }
+
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleOptimisticLock(
+            ObjectOptimisticLockingFailureException ex, HttpServletRequest request) {
+        log.warn("Optimistic lock conflict on path {}", request.getRequestURI());
+        return buildErrorResponse(
+                "Проект был изменён другим пользователем, обновите данные и попробуйте снова",
+                "CONFLICT_STALE_DATA",
+                HttpStatus.CONFLICT,
+                request
+        );
     }
 }

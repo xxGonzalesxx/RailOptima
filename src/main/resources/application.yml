@@ -22,12 +22,18 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: true
 
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+        default-page-size: 20
+
 server:
   port: 8080
 
 jwt:
   secret: ${JWT_SECRET:dev-secret-min-32-characters-long-for-testing-only}
-  expiration: 86400000
+  expiration: 7200000
 
 app:
   cors:

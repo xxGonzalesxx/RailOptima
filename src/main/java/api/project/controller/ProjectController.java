@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -36,7 +38,7 @@ public class ProjectController {
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<ProjectResponse>>> getMyProjects(
             Authentication authentication,
-            Pageable pageable
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
     ) {
         Page<ProjectResponse> page = projectService.getMyProjects(authentication.getName(), pageable);
         return ResponseEntity.ok(ApiResponse.success(PageResponse.from(page)));

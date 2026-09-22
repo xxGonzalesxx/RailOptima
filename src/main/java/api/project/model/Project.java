@@ -10,10 +10,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "projects", indexes = {
-        // Оптимизируем поиск проектов конкретного пользователя
-        @Index(name = "idx_project_owner", columnList = "owner_id"),
-        // Оптимизируем сортировку по дате создания
-        @Index(name = "idx_project_created_at", columnList = "created_at")
+        @Index(name = "idx_project_owner_created", columnList = "owner_id, created_at")
 })
 @Getter
 @Setter
@@ -36,11 +33,6 @@ public class Project {
     @Column(nullable = false, length = 30)
     private ProjectStatus status;
 
-    /**
-     * Связь модулей. Мы не подтягиваем сюда тяжелую сущность User из модуля AUTH.
-     * Мы храним только его UUID. Это обеспечивает слабую связность (Loose Coupling),
-     * что позволит легко распилить монолит на микросервисы в будущем.
-     */
     @Column(name = "owner_id", nullable = false)
     private UUID ownerId;
 
@@ -51,4 +43,8 @@ public class Project {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @Version
+    @Column(nullable = false)
+    private Long version;
 }
