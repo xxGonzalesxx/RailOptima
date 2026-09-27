@@ -14,7 +14,6 @@ public record ApiResponse<T>(
             timestamp = Instant.now();
         }
     }
-
     // 1. Для успешных ответов с данными
     public static <T> ApiResponse<T> success(T data) {
         return new ApiResponse<>(true, "Операция успешно завершена", data, null, null);

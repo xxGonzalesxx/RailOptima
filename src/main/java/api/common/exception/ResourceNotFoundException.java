@@ -13,7 +13,6 @@ public class ResourceNotFoundException extends BusinessException {
                 HttpStatus.NOT_FOUND
         );
     }
-
     // Обычный конструктор для кастомного сообщения
     public ResourceNotFoundException(String message) {
         super(message, DEFAULT_CODE, HttpStatus.NOT_FOUND);
