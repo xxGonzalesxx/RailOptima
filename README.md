@@ -71,7 +71,7 @@
 * **Spring Boot Starter Security / Data JPA / Web / Validation** — версия `4.1.1`
 * **io.jsonwebtoken (JJWT API, Impl, Jackson)** — версия `0.13.0` (Современный бессессионный JWT)
 * **org.projectlombok (Lombok)** — управляемая версия от родительского стартера
-* **maven-compiler-plugin** — версия `3.16.0` (Идеальная поддержка генерации байт-кода под Java 25)
+* **Gradle** — версия `9.8.0` (Идеальная поддержка генерации байт-кода под Java 25)
 
 ---
 
