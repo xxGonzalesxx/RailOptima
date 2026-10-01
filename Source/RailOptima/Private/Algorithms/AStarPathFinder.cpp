@@ -18,7 +18,6 @@ const int32 UAStarPathFinder::DirectionY[UAStarPathFinder::NumDirections] = { -1
 
 namespace
 {
-	// Обмен двух элементов heap с обновлением позиций.
 	void HeapSwap(
 		TArray<int32>& InHeap,
 		TArray<int32>& InPositions,
@@ -34,7 +33,6 @@ namespace
 		InPositions[NodeB] = InA;
 	}
 
-	// Просеять элемент вверх.
 	void HeapSiftUp(
 		TArray<int32>& InHeap,
 		TArray<int32>& InPositions,
@@ -53,7 +51,6 @@ namespace
 		}
 	}
 
-	// Просеять элемент вниз.
 	void HeapSiftDown(
 		TArray<int32>& InHeap,
 		TArray<int32>& InPositions,
@@ -86,7 +83,6 @@ namespace
 		}
 	}
 
-	// Добавить узел в heap.
 	void HeapPush(
 		TArray<int32>& InHeap,
 		TArray<int32>& InPositions,
@@ -98,7 +94,6 @@ namespace
 		HeapSiftUp(InHeap, InPositions, InHeap.Num() - 1, InFScores);
 	}
 
-	// Извлечь минимальный узел.
 	int32 HeapPop(
 		TArray<int32>& InHeap,
 		TArray<int32>& InPositions,
@@ -123,7 +118,6 @@ namespace
 		return Top;
 	}
 
-	// Обновить приоритет узла.
 	void HeapUpdate(
 		TArray<int32>& InHeap,
 		TArray<int32>& InPositions,
@@ -174,7 +168,6 @@ FRailPathResult UAStarPathFinder::FindPath(
 		return Result;
 	}
 
-	// Старт совпадает с финишем.
 	if (InStartIndex == InEndIndex)
 	{
 		Result.bFound = true;
@@ -216,7 +209,6 @@ FRailPathResult UAStarPathFinder::FindPath(
 
 		if (CurrentIndex == InEndIndex)
 		{
-			// Путь найден.
 			Result.bFound = true;
 			Result.ExpandedNodes = Expansions;
 			ReconstructPath(InGrid, CameFrom, InStartIndex, InEndIndex, Result);
@@ -261,10 +253,6 @@ FRailPathResult UAStarPathFinder::FindPath(
 	UE_LOG(LogTemp, Warning, TEXT("[AStar] Путь не найден. Расширений: %d."), Expansions);
 	return Result;
 }
-
-// ─────────────────────────────────────────────────────────────────
-//  Управление состоянием
-// ─────────────────────────────────────────────────────────────────
 
 void UAStarPathFinder::SetCostCalculator(UCostCalculator* InCalculator)
 {
@@ -351,6 +339,7 @@ void UAStarPathFinder::ReconstructPath(
 			: InGrid.StepSize_m;
 
 		const float SlopeRatio = FMath::Abs(CurrNode.Height_m - PrevNode.Height_m) / EdgeLength_m;
+
 		const float TurnAngleDeg = (i >= 2)
 			? [&]() -> float
 			{
@@ -373,7 +362,16 @@ void UAStarPathFinder::ReconstructPath(
 				: 0.0f;
 
 			const float GroundCoef = CostCalculator->GetGroundCoefficient(CurrNode.GroundType);
-			const float EdgeCost = CostCalculator->CalculateEdgeCost(EdgeLength_m, SlopeRatio, TurnAngleDeg, GroundCoef);
+
+			// FIX: уклон в процентах, а не отношением.
+			// Формула ТЗ «1 + |Уклон| × 0.1» даёт осмысленные множители:
+			//   склон 1%  → ×1.001
+			//   склон 10% → ×2.0
+			//   склон 67% → ×7.7
+			const float SlopePercent = SlopeRatio * 100.0f;
+
+			const float EdgeCost = CostCalculator->CalculateEdgeCost(
+				EdgeLength_m, SlopePercent, TurnAngleDeg, GroundCoef);
 
 			OutResult.TotalLength_m += EdgeLength_m;
 			OutResult.TotalCost += EdgeCost;
@@ -422,7 +420,12 @@ float UAStarPathFinder::EvaluateEdge(
 	}
 
 	const float GroundCoef = CostCalculator->GetGroundCoefficient(ToNode.GroundType);
-	return CostCalculator->CalculateEdgeCost(EdgeLength_m, SlopeRatio, TurnAngleDeg, GroundCoef);
+
+	// FIX: уклон в процентах — см. комментарий в ReconstructPath.
+	const float SlopePercent = SlopeRatio * 100.0f;
+
+	return CostCalculator->CalculateEdgeCost(
+		EdgeLength_m, SlopePercent, TurnAngleDeg, GroundCoef);
 }
 
 float UAStarPathFinder::Heuristic(

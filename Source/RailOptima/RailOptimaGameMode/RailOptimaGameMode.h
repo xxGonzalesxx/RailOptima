@@ -10,12 +10,9 @@
 #include "Algorithms/AStarPathFinder.h"
 #include "RailOptimaGameMode.generated.h"
 
-/**
- * Игровой режим RailOptima.
- *
- * Содержит точку входа для тестового прогона A* на синтетической
- * сетке и в дальнейшем — управление основными подсистемами.
- */
+class APathRenderer;
+class AProceduralTerrain;
+
 UCLASS()
 class RAILOPTIMA_API ARailOptimaGameMode : public AGameModeBase
 {
@@ -25,55 +22,53 @@ public:
 
 	ARailOptimaGameMode();
 
-	// ─────────────────────────────────────────────────────────────────
-	//  Жизненный цикл
-	// ─────────────────────────────────────────────────────────────────
-
 	virtual void BeginPlay() override;
 
-	// ─────────────────────────────────────────────────────────────────
-	//  Команды навигации
-	// ─────────────────────────────────────────────────────────────────
-
 	/**
-	 * Тестовый прогон A* на синтетической сетке.
+	 * Прогон A* на сетке, построенной из рельефа.
+	 * Если рельефа на уровне нет — fallback на синтетику.
 	 *
-	 * Замеряет время поиска пути и выводит результат в лог.
-	 *
-	 * @param InSize         Сторона квадратной сетки (512 → 512×512).
-	 * @param InStepSize_m   Шаг сетки, метры.
+	 * @param InTargetStepSize_m  Желаемый шаг сетки в метрах.
+	 *                            Реальный шаг = PixelSize_m × round(желаемый / PixelSize_m).
 	 */
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Test")
-	void RunAStarBenchmark(int32 InSize = 512, float InStepSize_m = 50.0f);
+	void RunAStarBenchmark(float InTargetStepSize_m = 100.0f);
 
 private:
 
 	// ─────────────────────────────────────────────────────────────────
-	//  Внутренняя логика
+	//  Построение сетки
 	// ─────────────────────────────────────────────────────────────────
 
 	/**
-	 * Сгенерировать синтетическую сетку.
+	 * Построить сетку из рельефа.
 	 *
-	 * Высоты — синусоидальный рельеф, грунты — по псевдослучайному
-	 * распределению. В центре — «город» (запретная зона) для проверки
-	 * обхода.
-	 *
-	 * @param InSize         Сторона сетки.
-	 * @param InStepSize_m   Шаг сетки, метры.
-	 * @return               Заполненная сетка.
+	 * PNG рельефа 1009×1009 пикселей по 30 м = ~30 км по стороне.
+	 * Сетка берёт каждый N-й пиксель: N = round(InTargetStepSize_m / PixelSize_m).
+	 * Высоты — метры над уровнем моря (без нормализации).
 	 */
+	FRailGridData BuildGridFromTerrain(
+		const AProceduralTerrain& InTerrain,
+		float InTargetStepSize_m) const;
+
+	// Синтетическая сетка — только если на уровне нет рельефа.
 	FRailGridData GenerateSyntheticGrid(int32 InSize, float InStepSize_m) const;
 
 	// ─────────────────────────────────────────────────────────────────
-	//  Состояние
+	//  Подсистемы
 	// ─────────────────────────────────────────────────────────────────
 
-	// Поисковик пути, создаётся в BeginPlay.
+	void SetupPathRenderer();
+
 	UPROPERTY()
 	TObjectPtr<UAStarPathFinder> PathFinder;
 
-	// Калькулятор стоимости.
 	UPROPERTY()
 	TObjectPtr<UCostCalculator> CostCalculator;
+
+	UPROPERTY()
+	TObjectPtr<APathRenderer> PathRenderer;
+
+	UPROPERTY()
+	TObjectPtr<AProceduralTerrain> Terrain;
 };
