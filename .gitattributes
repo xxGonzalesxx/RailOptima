@@ -1,57 +1,81 @@
 # ============================================================
-# RailOptima — .gitattributes для Git LFS (Unreal Engine 5)
-# Все бинарные ассеты должны управляться через LFS
+# RailOptima — .gitattributes
 # ============================================================
 
-# --- Ассеты Unreal Engine (обязательно) ---
-*.uasset filter=lfs diff=lfs merge=lfs -text
-*.umap filter=lfs diff=lfs merge=lfs -text
+# ── Нормализация строк ─────────────────────────────────────
+# Все файлы — текстовые по умолчанию. Git сам определит,
+# где бинарник, но не будет ошибаться с окончаниями.
+* text=auto
 
-# --- Исходные (raw) ассеты в /RawContent ---
-# 3D-модели
-*.fbx filter=lfs diff=lfs merge=lfs -text
-*.obj filter=lfs diff=lfs merge=lfs -text
+# Исходники и конфиги — diff-friendly, LF.
+*.cpp       text diff=cpp
+*.h         text diff=cpp
+*.hpp       text diff=cpp
+*.inl       text diff=cpp
+*.cs        text diff=csharp
+*.ini       text
+*.uproject  text eol=lf
+*.uplugin   text eol=lf
+*.json      text
+*.md        text
+*.txt       text
+
+# Скрипты.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.sh        text eol=lf
+
+# ── Git LFS: ассеты Unreal Engine ──────────────────────────
+*.uasset  filter=lfs diff=lfs merge=lfs -text
+*.umap    filter=lfs diff=lfs merge=lfs -text
+*.ubulk   filter=lfs diff=lfs merge=lfs -text
+*.uexp    filter=lfs diff=lfs merge=lfs -text
+
+# ── Git LFS: 3D-модели (RawContent) ────────────────────────
+*.fbx   filter=lfs diff=lfs merge=lfs -text
+*.obj   filter=lfs diff=lfs merge=lfs -text
 *.blend filter=lfs diff=lfs merge=lfs -text
-*.3ds filter=lfs diff=lfs merge=lfs -text
+*.3ds   filter=lfs diff=lfs merge=lfs -text
 
-# Текстуры и изображения
-*.png filter=lfs diff=lfs merge=lfs -text
-*.jpg filter=lfs diff=lfs merge=lfs -text
-*.jpeg filter=lfs diff=lfs merge=lfs -text
-*.bmp filter=lfs diff=lfs merge=lfs -text
-*.tga filter=lfs diff=lfs merge=lfs -text
-*.exr filter=lfs diff=lfs merge=lfs -text
-*.hdr filter=lfs diff=lfs merge=lfs -text
-*.tif filter=lfs diff=lfs merge=lfs -text
-*.tiff filter=lfs diff=lfs merge=lfs -text
-*.psd filter=lfs diff=lfs merge=lfs -text
-
-# Аудио
-*.wav filter=lfs diff=lfs merge=lfs -text
-*.mp3 filter=lfs diff=lfs merge=lfs -text
-*.ogg filter=lfs diff=lfs merge=lfs -text
-
-# Видео
-*.mp4 filter=lfs diff=lfs merge=lfs -text
-*.mov filter=lfs diff=lfs merge=lfs -text
-
-# Данные / карты высот (для проекта RailOptima)
+# ── Git LFS: изображения и карты высот ─────────────────────
+*.png   filter=lfs diff=lfs merge=lfs -text
+*.jpg   filter=lfs diff=lfs merge=lfs -text
+*.jpeg  filter=lfs diff=lfs merge=lfs -text
+*.bmp   filter=lfs diff=lfs merge=lfs -text
+*.tga   filter=lfs diff=lfs merge=lfs -text
+*.exr   filter=lfs diff=lfs merge=lfs -text
+*.hdr   filter=lfs diff=lfs merge=lfs -text
+*.tif   filter=lfs diff=lfs merge=lfs -text
+*.tiff  filter=lfs diff=lfs merge=lfs -text
+*.psd   filter=lfs diff=lfs merge=lfs -text
 *.geotiff filter=lfs diff=lfs merge=lfs -text
-*.tif filter=lfs diff=lfs merge=lfs -text
-*.tiff filter=lfs diff=lfs merge=lfs -text
+*.hgt   filter=lfs diff=lfs merge=lfs -text
 
-# Архивы
-*.zip filter=lfs diff=lfs merge=lfs -text
-*.7z filter=lfs diff=lfs merge=lfs -text
-*.rar filter=lfs diff=lfs merge=lfs -text
+# ── Git LFS: геоданные (OSM, границы) ──────────────────────
+*.geojson  filter=lfs diff=lfs merge=lfs -text
+*.shp      filter=lfs diff=lfs merge=lfs -text
+*.shx      filter=lfs diff=lfs merge=lfs -text
+*.dbf      filter=lfs diff=lfs merge=lfs -text
+*.kml      filter=lfs diff=lfs merge=lfs -text
 
-# ============================================================
-# Настройки для текстовых файлов (нормализация переносов строк)
-# ============================================================
-*.cpp text eol=lf
-*.h text eol=lf
-*.cs text eol=lf
-*.ini text eol=lf
-*.uproject text eol=lf
-*.json text eol=lf
-*.md text eol=lf
+# ── Git LFS: аудио ─────────────────────────────────────────
+*.wav  filter=lfs diff=lfs merge=lfs -text
+*.mp3  filter=lfs diff=lfs merge=lfs -text
+*.ogg  filter=lfs diff=lfs merge=lfs -text
+
+# ── Git LFS: видео ─────────────────────────────────────────
+*.mp4  filter=lfs diff=lfs merge=lfs -text
+*.mov  filter=lfs diff=lfs merge=lfs -text
+
+# ── Git LFS: архивы ────────────────────────────────────────
+*.zip  filter=lfs diff=lfs merge=lfs -text
+*.7z   filter=lfs diff=lfs merge=lfs -text
+*.rar  filter=lfs diff=lfs merge=lfs -text
+
+# ── Скомпилированные библиотеки (без LFS, без диффов) ──────
+*.dll    binary
+*.exe    binary
+*.lib    binary
+*.so     binary
+*.dylib  binary
+*.a      binary
