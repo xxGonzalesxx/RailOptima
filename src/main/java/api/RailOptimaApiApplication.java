@@ -9,3 +9,4 @@ public class RailOptimaApiApplication {
          SpringApplication.run(RailOptimaApiApplication.class, args);
     }
 }
+
