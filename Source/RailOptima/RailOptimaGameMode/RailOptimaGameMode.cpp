@@ -4,6 +4,11 @@
 // ПривГУПС, 2026.
 
 #include "RailOptimaGameMode.h"
+#include "Algorithms/AStarPathFinder.h"
+#include "Algorithms/CostCalculator.h"
+#include "Core/ProceduralTerrain.h"
+#include "Kismet/GameplayStatics.h"
+#include "Misc/Paths.h"
 
 // ─────────────────────────────────────────────────────────────────
 //  Жизненный цикл
@@ -22,7 +27,43 @@ void ARailOptimaGameMode::BeginPlay()
 	CostCalculator = NewObject<UCostCalculator>(this);
 	PathFinder->SetCostCalculator(CostCalculator);
 
-	// Автоматический прогон бенчмарка при старте.
+	// ─────────────────────────────────────────────────────────────────
+	//  Рельеф из PNG
+	// ─────────────────────────────────────────────────────────────────
+
+	const FString HeightmapPath = FPaths::ProjectDir() / TEXT("RawContent/heightmap.png");
+
+	AProceduralTerrain* Terrain = nullptr;
+	TArray<AActor*> FoundTerrains;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AProceduralTerrain::StaticClass(), FoundTerrains);
+
+	if (FoundTerrains.Num() > 0)
+	{
+		Terrain = Cast<AProceduralTerrain>(FoundTerrains[0]);
+	}
+	else
+	{
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Terrain = GetWorld()->SpawnActor<AProceduralTerrain>(
+			AProceduralTerrain::StaticClass(), FTransform::Identity, SpawnParams);
+	}
+
+	if (Terrain)
+	{
+		Terrain->TerrainParameters.MinElevation_m = 505.0f;
+		Terrain->TerrainParameters.MaxElevation_m = 2982.0f;
+		Terrain->TerrainParameters.MeshResolution = 1009;
+		Terrain->TerrainParameters.StepSize_m = 30.0f;
+		Terrain->TerrainParameters.ZScale = 1.0f;
+
+		Terrain->BuildFromHeightmap(HeightmapPath);
+	}
+
+	// ─────────────────────────────────────────────────────────────────
+	//  Бенчмарк A* на синтетической сетке
+	// ─────────────────────────────────────────────────────────────────
+
 	RunAStarBenchmark(512, 50.0f);
 }
 
@@ -86,7 +127,6 @@ FRailGridData ARailOptimaGameMode::GenerateSyntheticGrid(int32 InSize, float InS
 	Grid.StepSize_m = InStepSize_m;
 	Grid.Nodes.SetNum(InSize * InSize);
 
-	// Псевдослучайный генератор с фиксированным seed — для воспроизводимости.
 	FRandomStream Random(1337);
 
 	const float CenterX = InSize * 0.5f;
@@ -101,14 +141,12 @@ FRailGridData ARailOptimaGameMode::GenerateSyntheticGrid(int32 InSize, float InS
 			Node.X = X;
 			Node.Y = Y;
 
-			// Синусоидальный рельеф + небольшой шум.
 			const float FX = static_cast<float>(X) / InSize;
 			const float FY = static_cast<float>(Y) / InSize;
 			const float Base = FMath::Sin(FX * 4.0f * PI) * 80.0f
 				+ FMath::Cos(FY * 3.0f * PI) * 60.0f;
 			Node.Height_m = 200.0f + Base + Random.FRandRange(-5.0f, 5.0f);
 
-			// Распределение грунтов: в основном суглинок, местами — остальное.
 			const float Roll = Random.FRand();
 			if (Roll < 0.50f)
 			{
@@ -135,7 +173,6 @@ FRailGridData ARailOptimaGameMode::GenerateSyntheticGrid(int32 InSize, float InS
 				Node.GroundType = ERailGroundType::Water;
 			}
 
-			// Запретная зона — круг в центре карты.
 			const float DX = static_cast<float>(X) - CenterX;
 			const float DY = static_cast<float>(Y) - CenterY;
 			const float Radius = InSize * 0.1f;
