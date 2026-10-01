@@ -10,12 +10,6 @@
 #include "Algorithms/CostCalculator.h"
 #include "AStarPathFinder.generated.h"
 
-/**
- * Узел сетки поиска пути.
- *
- * Сетка строится поверх ландшафта с шагом 50–100 м.
- * Индекс = Y × Width + X.
- */
 USTRUCT(BlueprintType)
 struct FRailGridNode
 {
@@ -27,7 +21,6 @@ struct FRailGridNode
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Grid")
 	int32 Y = 0;
 
-	// Высота над уровнем моря, метры.
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Grid")
 	float Height_m = 0.0f;
 
@@ -38,10 +31,6 @@ struct FRailGridNode
 	bool bIsForbidden = false;
 };
 
-/**
- * Сетка узлов для A*.
- * Хранится линейно, доступ по индексу Y × Width + X.
- */
 USTRUCT(BlueprintType)
 struct FRailGridData
 {
@@ -53,7 +42,6 @@ struct FRailGridData
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Grid")
 	int32 Height = 0;
 
-	// Шаг сетки, метры.
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Grid")
 	float StepSize_m = 50.0f;
 
@@ -70,6 +58,9 @@ struct FRailGridData
 
 /**
  * Результат поиска пути A*.
+ *
+ * Помимо узлов и итогов, хранит по каждому ребру его стоимость
+ * и длину — это нужно для раскраски и отчёта.
  */
 USTRUCT(BlueprintType)
 struct FRailPathResult
@@ -83,25 +74,25 @@ struct FRailPathResult
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Path")
 	TArray<int32> NodeIndices;
 
-	// Суммарная длина пути, метры.
+	// Стоимость каждого ребра, длина = NodeIndices.Num() - 1.
+	// Ребро i соединяет узлы NodeIndices[i] и NodeIndices[i+1].
+	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Path")
+	TArray<float> EdgeCosts;
+
+	// Длина каждого ребра в метрах, та же длина массива.
+	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Path")
+	TArray<float> EdgeLengths;
+
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Path")
 	double TotalLength_m = 0.0;
 
-	// Суммарная стоимость строительства.
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Path")
 	double TotalCost = 0.0;
 
-	// Число расширенных узлов (для отладки производительности).
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Path")
 	int32 ExpandedNodes = 0;
 };
 
-/**
- * Поиск оптимального маршрута алгоритмом A*.
- *
- * Вес ребра — стоимость строительства, а не длина. Используется
- * собственный бинарный heap с поддержкой UpdatePriority.
- */
 UCLASS()
 class RAILOPTIMA_API UAStarPathFinder : public UObject
 {
@@ -109,19 +100,6 @@ class RAILOPTIMA_API UAStarPathFinder : public UObject
 
 public:
 
-	// ─────────────────────────────────────────────────────────────────
-	//  Команды навигации
-	// ─────────────────────────────────────────────────────────────────
-
-	/**
-	 * Найти путь между двумя узлами сетки.
-	 *
-	 * @param InGrid           Сетка поиска.
-	 * @param InStartIndex     Индекс стартового узла.
-	 * @param InEndIndex       Индекс финишного узла.
-	 * @param InMaxExpansions  Лимит расширений.
-	 * @return                 Результат поиска.
-	 */
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Path")
 	FRailPathResult FindPath(
 		const FRailGridData& InGrid,
@@ -129,25 +107,13 @@ public:
 		int32 InEndIndex,
 		int32 InMaxExpansions = 500000);
 
-	// ─────────────────────────────────────────────────────────────────
-	//  Управление состоянием
-	// ─────────────────────────────────────────────────────────────────
-
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Path")
 	void SetCostCalculator(UCostCalculator* InCalculator);
-
-	// ─────────────────────────────────────────────────────────────────
-	//  Геттеры
-	// ─────────────────────────────────────────────────────────────────
 
 	UFUNCTION(BlueprintPure, Category = "RailOptima|Path")
 	UCostCalculator* GetCostCalculator() const { return CostCalculator; }
 
 private:
-
-	// ─────────────────────────────────────────────────────────────────
-	//  Внутренняя логика
-	// ─────────────────────────────────────────────────────────────────
 
 	void CollectNeighbors(
 		const FRailGridData& InGrid,
@@ -169,19 +135,10 @@ private:
 
 	float Heuristic(const FRailGridData& InGrid, int32 InFromIndex, int32 InToIndex) const;
 
-	// ─────────────────────────────────────────────────────────────────
-	//  Состояние
-	// ─────────────────────────────────────────────────────────────────
-
 	UPROPERTY()
 	TObjectPtr<UCostCalculator> CostCalculator;
 
-	// ─────────────────────────────────────────────────────────────────
-	//  Константы
-	// ─────────────────────────────────────────────────────────────────
-
 	static constexpr int32 NumDirections = 8;
-
 	static const int32 DirectionX[NumDirections];
 	static const int32 DirectionY[NumDirections];
 };
