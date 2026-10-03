@@ -1,108 +1,275 @@
-# 🚂 RailOptima API
+# 🚂 RailOptima
 
-[![Java Version](https://shields.io)](https://openjdk.org)
-[![Spring Boot](https://shields.io)](https://spring.io)
-[![PostgreSQL](https://shields.io)](https://postgresql.org)
-[![Architecture](https://shields.io)](#)
+[![Java](https://img.shields.io/badge/Java-25_LTS-orange)](https://openjdk.org)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1.1-brightgreen)](https://spring.io)
+[![Gradle](https://img.shields.io/badge/Gradle-9.8-02303A)](https://gradle.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18--alpine-336791)](https://postgresql.org)
+[![React](https://img.shields.io/badge/React-19-61DAFB)](https://react.dev)
+[![Vite](https://img.shields.io/badge/Vite-8-646CFF)](https://vite.dev)
 
-Высокопроизводительное и отказоустойчивое **REST API** для экосистемы **RailOptima**, разработанное на передовом технологическом стеке **2026 года**. Служит единым «мозгом» и точкой входа для интерактивного веб-интерфейса (**React**) и расчетно-визуализационного комплекса (**Unity**).
+Монорепозиторий проекта **RailOptima** — высокопроизводительной платформы для управления железнодорожными проектами. Включает REST API (Spring Boot), веб-интерфейс (React + Vite) и задел под Unity-клиент (3D-визуализация).
 
 ---
 
-## 🗺️ Архитектура системы
-
-Проект спроектирован по принципу **модульного монолита (Modular Monolith)** с жесткой изоляцией контекстов. Каждый бизнес-модуль (`AUTH`, `PROJECT`, `LLM`) независим, общается с другими модулями исключительно через плоские DTO (Java Records) и идентификаторы (UUIDv7), что гарантирует бесшовный распил на микросервисы при росте нагрузок.
+## 📁 Структура репозитория
 
 ```text
-┌─────────────────────────────────────────────────────────────────────┐
-│                         КЛИЕНТЫ (Frontend)                         │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  [React-сайт (v19)]                 [Unity-клиент (C#)]             │
-│  • Дашборд проектов                 • 3D-визуализация путей         │
-│  • Чат с ИИ                         • Расчеты смет                  │
-│  • Авторизация                      • Экспорт отчетов               │
-│         │                                  │                        │
-│         └─────────────────┬────────────────┘                        │
-│                           │ (REST API + JWT)                        │
-│                           ▼                                         │
-└─────────────────────────────────────────────────────────────────────┘
-                            │
-                            ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│                       БЭКЕНД (RailOptima API)                       │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                     │
-│  МОДУЛЬНЫЙ МОНОЛИТ (Java 25 + Spring Boot 4.1.1)                    │
-│                                                                     │
-│  ┌─────────────┐       ┌─────────────┐       ┌───────────────────┐  │
-│  │    AUTH     │       │   PROJECT   │       │        LLM        │  │
-│  │ (Stateless) │       │   (CRUD)    │       │ (DeepSeek/Ollama) │  │
-│  └─────────────┘       └─────────────┘       └─────────┬─────────┘  │
-│                                                        │            │
-│  ┌─────────────────────────────────────────────────────┴─────────┐  │
-│  │          COMMON (ApiResponse, PageResponse, Exceptions)      │  │
-│  └───────────────────────────────────────────────────────────────┘  │
-│                         │                         │                 │
-│                         ▼                         ▼                 │
-│              ┌─────────────────┐       ┌─────────────────────┐      │
-│              │  PostgreSQL 18  │       │   Внешний LLM API   │      │
-│              │(Локально/Облако)│       │    (HTTP-клиент)    │      │
-│              └─────────────────┘       └─────────────────────┘      │
-└─────────────────────────────────────────────────────────────────────┘
+RailOptima/
+├── Backend/                    # Spring Boot приложение (Java 25)
+│   └── src/main/
+│       ├── java/api/           # Исходный код (auth, project, common)
+│       └── resources/          # application.yml + Flyway-миграции
+├── Frontend/                   # React + Vite + TypeScript
+│   ├── src/
+│   │   ├── api/generated/      # Orval-клиент (генерируется, не коммитится)
+│   │   ├── lib/                # axios-мутатор, jwt-хранилище
+│   │   ├── components/         # UI-компоненты (пусто — заполняется)
+│   │   ├── pages/              # Страницы (пусто — заполняется)
+│   │   ├── hooks/              # Кастомные хуки (пусто — заполняется)
+│   │   ├── services/           # Бизнес-логика (пусто — заполняется)
+│   │   ├── types/              # Общие типы (пусто — заполняется)
+│   │   └── assets/
+│   ├── orval.config.ts         # Генерация API-клиента из OpenAPI
+│   └── vite.config.ts          # Alias @/ → src/, прокси /api → :8080
+├── build.gradle.kts            # Корневой Gradle (sourceSets на Backend/src)
+├── settings.gradle.kts
+├── gradlew / gradlew.bat
+├── gradle/                     # Wrapper + libs.versions.toml
+├── docker-compose.yml          # PostgreSQL 18
+├── .env                        # Секреты (не в git)
+├── .env.example                # Шаблон
+└── README.md
 ```
 
-
-## 🛠️ Технологический стек и версии
-
-Проект использует строго зафиксированные **LTS (Long Term Support)** версии плагинов и инфраструктуры, обеспечивающие максимальную производительность ввода-вывода (Async I/O) и безопасность данных.
-
-### Компоненты и платформы
-
-| Компонент | Технология | Версия / Спецификация | Описание |
-| :--- | :--- | :--- | :--- |
-| **Бэкенд-платформа** | Java | **25 (LTS)** | Сборка под новейшую виртуальную машину |
-| **Фреймворк** | Spring Boot | **4.1.1 (LTS)** | Ядро монолита, управление бинами |
-| **База данных** | PostgreSQL | **18-alpine (LTS)** | Нативная поддержка UUIDv7, высокая скорость индексации |
-| **Веб-клиент** | React + TypeScript | **19** | Асинхронные Server Actions, рендеринг дашбордов |
-| **Десктоп-движок** | Unity + C# | **2022 LTS** | 3D-моделирование и расчет сметной стоимости |
-
-### Зависимости и Maven-плагины (`pom.xml`)
-* **Spring Boot Starter Security / Data JPA / Web / Validation** — версия `4.1.1`
-* **io.jsonwebtoken (JJWT API, Impl, Jackson)** — версия `0.13.0` (Современный бессессионный JWT)
-* **org.projectlombok (Lombok)** — управляемая версия от родительского стартера
-* **Gradle** — версия `9.8.0` (Идеальная поддержка генерации байт-кода под Java 25)
+> **Gradle в корне репозитория.** Все команды бэкенда (`./gradlew bootRun`, `./gradlew build`) выполняются **из корня** `RailOptima/`, а не из `Backend/`.
 
 ---
 
-## 📊 Что реализовано на текущем этапе
+## 🛠️ Технологический стек
 
-На данный момент заложен железобетонный фундамент архитектуры и полностью закрыты два ключевых слоя:
-
-### 1. Единый модуль `COMMON` (Стандартизация API)
-* **`ApiResponse<T>` & `PageResponse<T>`:** Реализованы на базе иммутабельных **Java Records**. Контракт ответов строго зафиксирован. Временные метки используют глобальный стандарт **`Instant` (UTC ISO-8601)**, что решает проблему часовых поясов серверов и гарантирует безотказный парсинг дат в JS (React) и C# (Unity).
-* **`GlobalExceptionHandler`:** Централизованный перехватчик. Автоматически транслирует системные сбои и ошибки валидации полей (`@Valid`) в предсказуемый формат ответов с корректными HTTP-статусами.
-* **Иерархия бизнес-исключений:** Созданы расширяемые классы доменных ошибок (`ConflictException` ➔ 409, `ForbiddenException` ➔ 403, `ResourceNotFoundException` ➔ 404, `ValidationException` ➔ 400), снабженные строковыми кодами ошибок (`errorCode`) для локализации на клиентах.
-* **Security & CORS:** В `SecurityConfig` настроен современный декларативный CORS с кэшированием предзапросов браузера (`maxAge(3600)`), отсекающий лишнюю нагрузку. Включено хэширование паролей промышленным стандартом `BCrypt` с силой раунда `12`.
-
-### 2. Слой данных и контрактов модулей `AUTH` и `PROJECT`
-* **`JwtTokenProvider` & `JwtAuthenticationFilter`:** Написаны на базе чистого API JJWT 0.13.0. Реализуют полностью **Stateless-подход**: UUID пользователя зашивается прямо в токен, позволяя бэкенду авторизовать запросы мгновенно без единого похода в базу данных.
-* **Сущности и Индексы:** Написаны JPA-модели `User` и `Project`. Таблицы оптимизированы составными индексами (`idx_user_email`, `idx_project_owner`, `idx_project_created_at`) под мгновенную выдачу постраничных списков дашборда.
-* **Контракты обмена (DTO):** Прописаны рекорды-запросы (`ProjectCreateRequest`, `RegisterRequest` и др.). Команда фронтенда и Unity уже имеет на руках готовые интерфейсы JSON для полной интеграции.
+| Компонент | Технология | Версия |
+| :--- | :--- | :--- |
+| Бэкенд-платформа | Java (LTS) | **25** |
+| Фреймворк | Spring Boot | **4.1.1** |
+| Сборка | Gradle (Kotlin DSL) | **9.8** |
+| БД | PostgreSQL | **18-alpine** |
+| Миграции | Flyway | (из Spring Boot BOM) |
+| JWT | JJWT | **0.13.0** |
+| OpenAPI | springdoc-openapi | **3.1.1** |
+| Веб-клиент | React + TypeScript | **19 / 6.0** |
+| Сборщик фронта | Vite | **8** |
+| Генератор API-клиента | Orval | **8.37** |
+| Пакетный менеджер | pnpm | **12** |
+| Десктоп-клиент | Unity + C# | 2022 LTS (в планах) |
 
 ---
 
-## 🚀 Планы на ближайшее будущее (Что реализуем далее)
+## 🚀 Быстрый старт
 
-Разработка продолжается строго по шагам «сверху вниз» для обеспечения наивысшего рантайм-качества:
+### Требования
 
-### 🔹 Ближайшие шаги (Модуль `PROJECT` и запуск ядра):
-1. **Реализация `ProjectService` и `ProjectController`:** Написание бизнес-логики CRUD-операций для проектов, внедрение пагинации и жесткой проверки прав собственности (один юзер не может менять проекты другого).
-2. **Инфраструктурный запуск:** Поднятие локального контейнера PostgreSQL 18 через `Backend/docker-compose.yml`, первый запуск бэкенда и тестирование сквозных сценариев (Регистрация ➔ Получение JWT ➔ Создание проекта с токеном) через Postman/HTTP-клиент.
-3. **Мониторинг:** Настройка Spring Boot Actuator эндпоинтов (`/actuator/health`) для интеграции с системами контроля работоспособности.
+- **JDK 25** (`java -version` → 25.x)
+- **Docker** + **Docker Compose**
+- **pnpm** (для фронта)
 
-### 🔹 Перспективные шаги (Модуль `LLM` и Продакшен):
-1. **Интеграция ИИ (`llm`):** Создание сервисного слоя для работы с внешними LLM-провайдерами (**DeepSeek API** для глобального облака или локальный запуск через **Ollama**). Реализация контекстного чата-помощника для автоматического расчета строительных смет.
-2. **Локализация ошибок:** Наполнение карты `validationErrors` в ответах, чтобы React-формы могли подсвечивать конкретные некорректно заполненные инпуты.
-3. **Облачная миграция БД:** Перевод пропертис `application.yml` на чтение переменных окружения для безопасного бесшовного переключения бэкенда на облачные базы данных (**Neon.tech** / **Supabase** / **Yandex Cloud**) с обязательным шифрованием трафика (`sslmode=require`).
-4. **Базы данных под ключ:** Внедрение системы миграций (**Liquibase** или
+### 1. Клонировать репозиторий
+
+```bash
+git clone <repo-url> RailOptima
+cd RailOptima
+```
+
+### 2. Настроить окружение
+
+```bash
+cp .env.example .env
+# Открой .env и при необходимости поменяй POSTGRES_PASSWORD, JWT_SECRET, DB_*
+```
+
+`.env` используется **и Docker Compose** (для Postgres), **и Spring Boot** (для datasource, JWT, CORS).
+
+### 3. Поднять PostgreSQL
+
+```bash
+docker compose up -d
+docker compose ps   # railoptima-db должен быть Up
+```
+
+### 4. Запустить бэкенд
+
+```bash
+./gradlew bootRun
+```
+
+Проверка:
+```bash
+curl http://localhost:8080/actuator/health
+# {"status":"UP"}
+```
+
+Swagger UI: <http://localhost:8080/swagger-ui.html>
+
+Flyway автоматически применит миграции `V1__init.sql` → `V3__add_projects_owner_fk.sql` при первом запуске.
+
+### 5. Запустить фронтенд
+
+```bash
+cd Frontend
+pnpm install
+pnpm dev
+```
+
+Открыть: <http://localhost:3000>
+
+Vite проксирует `/api/*` → `http://localhost:8080` (см. `Frontend/vite.config.ts`).
+
+---
+
+## 📜 Команды
+
+### Бэкенд (из корня репозитория)
+
+| Команда | Действие |
+| :--- | :--- |
+| `./gradlew build` | Собрать jar + прогнать тесты |
+| `./gradlew clean build` | Полная пересборка |
+| `./gradlew bootRun` | Запустить приложение |
+| `./gradlew test` | Только тесты |
+
+### Frontend (из `Frontend/`)
+
+| Команда | Действие |
+| :--- | :--- |
+| `pnpm install` | Установить зависимости |
+| `pnpm dev` | Dev-сервер на `:3000` |
+| `pnpm build` | Production-сборка в `dist/` |
+| `pnpm preview` | Локальный просмотр `dist/` |
+| `pnpm lint` | Oxlint |
+| `pnpm api:generate` | Пересобрать API-клиент через Orval |
+
+### Docker
+
+| Команда | Действие |
+| :--- | :--- |
+| `docker compose up -d` | Запустить Postgres |
+| `docker compose down` | Остановить |
+| `docker compose down -v` | Остановить + удалить volume (данные БД) |
+| `docker compose logs -f postgres` | Логи БД |
+
+---
+
+## 🔄 Генерация API-клиента (Orval)
+
+Orval читает OpenAPI-спеку и генерирует типизированный React Query-клиент в `Frontend/src/api/generated/`.
+
+**Способ 1 — через файл `swagger.json`** (текущий):
+
+```bash
+# Бэкенд должен быть запущен
+curl -o Frontend/swagger.json http://localhost:8080/v3/api-docs
+
+cd Frontend
+pnpm api:generate
+```
+
+**Способ 2 — напрямую с URL** — поменять в `orval.config.ts`:
+
+```ts
+input: { target: 'http://localhost:8080/v3/api-docs' },
+```
+
+**Важно:** `Frontend/src/api/generated/` **не коммитится** (в `.gitignore`). Каждый разработчик генерирует клиент локально после `pnpm install`.
+
+---
+
+## 🏛️ Архитектура
+
+**Модульный монолит** с изоляцией контекстов. Каждый модуль (`auth`, `project`, `common`) независим, общается через плоские DTO (Java Records) и UUID.
+
+```text
+┌────────────────────────────────────────────┐
+│              КЛИЕНТЫ                        │
+│  React (v19)          Unity (C#)           │
+└──────────────┬─────────────────────────────┘
+               │ REST API + JWT
+               ▼
+┌────────────────────────────────────────────┐
+│         БЭКЕНД (Spring Boot 4)             │
+│                                            │
+│  ┌────────┐  ┌─────────┐  ┌──────────┐    │
+│  │  AUTH  │  │ PROJECT │  │   LLM    │    │
+│  └────────┘  └─────────┘  └──────────┘    │
+│  ┌────────────────────────────────────┐   │
+│  │ COMMON (ApiResponse, Exceptions)    │   │
+│  └────────────────────────────────────┘   │
+└──────┬──────────────────────┬──────────────┘
+       │                      │
+       ▼                      ▼
+  PostgreSQL 18         Внешний LLM API
+```
+
+### Реализовано
+
+**Модуль `COMMON`**
+- `ApiResponse<T>` и `PageResponse<T>` — иммутабельные Java Records, timestamp в UTC ISO-8601
+- `GlobalExceptionHandler` — централизованная обработка ошибок с корректными HTTP-статусами
+- Иерархия исключений: `ConflictException` (409), `ForbiddenException` (403), `ResourceNotFoundException` (404), `ValidationException` (400)
+- `SecurityConfig` с CORS, BCrypt (rounds=12)
+
+**Модули `AUTH` + `PROJECT`**
+- Stateless JWT (JJWT 0.13.0) — UUID пользователя зашит в токен, без похода в БД на каждый запрос
+- JPA-сущности `User`, `Project` с индексами под пагинацию (`idx_user_email`, `idx_project_owner`, `idx_project_created_at`)
+- DTO-рекорды: `RegisterRequest`, `LoginRequest`, `ProjectCreateRequest`, `ProjectUpdateRequest` и др.
+- Flyway-миграции `V1`–`V3`
+
+### В планах
+
+1. `ProjectService` и полный CRUD с проверкой прав собственности
+2. Мониторинг через Actuator
+3. Модуль `LLM` (DeepSeek API / локальный Ollama)
+4. Локализация ошибок валидации (`validationErrors` в ответах)
+5. Облачная миграция БД (Neon / Supabase / Yandex Cloud) с `sslmode=require`
+
+---
+
+## 🔐 Безопасность
+
+- **`.env` не коммитится** (в `.gitignore`), в репозитории только `.env.example`
+- Секреты: `POSTGRES_PASSWORD`, `JWT_SECRET`, `DB_*`
+- JWT stateless, BCrypt для паролей
+- CORS настроен через `CORS_ALLOWED_ORIGINS` в `.env`
+
+**Перед деплоем** обязательно сгенерировать новые секреты:
+```bash
+openssl rand -base64 32   # JWT_SECRET
+openssl rand -hex 16      # POSTGRES_PASSWORD
+```
+
+---
+
+## 🧹 Что игнорируется Git
+
+- `build/` — артефакты Gradle
+- `.gradle/` — кэш Gradle
+- `.idea/`, `*.iml` — IntelliJ
+- `Frontend/node_modules/`, `Frontend/dist/`
+- `Frontend/swagger.json`
+- `Frontend/src/api/generated/`
+- `.env`
+
+---
+
+## 📌 Соглашения
+
+- **Java-код** — только в `Backend/src/main/java/api/...`
+- **Gradle-задачи** — запускаются из корня
+- **Фронтенд-команды** — из `Frontend/`
+- **DTO** — Java Records, не классы
+- **Даты** — только `Instant` (UTC)
+- **UUID** — версия 7 (time-ordered)
+
+---
+
+## 📄 Лицензия
+
+Приватный проект. Все права защищены.
