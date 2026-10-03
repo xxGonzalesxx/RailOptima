@@ -8,7 +8,10 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "api:generate": "orval --config orval.config.ts"
+    "api:generate": "orval --config orval.config.ts",
+    "api:sync": "curl -fso swagger.json http://localhost:8080/v3/api-docs && orval --config orval.config.ts",
+    "predev": "test -d src/api/generated || pnpm api:generate",
+    "prebuild": "test -d src/api/generated || pnpm api:generate"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.103.2",
