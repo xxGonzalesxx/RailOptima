@@ -59,12 +59,23 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
+sourceSets {
+    main {
+        java.srcDirs("Backend/src/main/java")
+        resources.srcDirs("Backend/src/main/resources")
+    }
+    test {
+        java.srcDirs("Backend/src/test/java")
+        resources.srcDirs("Backend/src/test/resources")
+    }
+}
+
 tasks.withType<Test> {
     useJUnitPlatform()
 }
 
 tasks.withType<org.springframework.boot.gradle.tasks.run.BootRun> {
-    val envFile = file(".env")
+    val envFile = file("Backend/.env")   // ← было ".env"
     if (envFile.exists()) {
         envFile.readLines().forEach { line ->
             if (line.isNotBlank() && !line.startsWith("#") && line.contains("=")) {
