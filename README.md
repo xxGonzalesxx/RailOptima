@@ -1,229 +1,108 @@
-# 🚂 RailOptima Launcher
+# 🚂 RailOptima API
 
-> Web-лаунчер для умного проектирования железных дорог
+[![Java Version](https://shields.io)](https://openjdk.org)
+[![Spring Boot](https://shields.io)](https://spring.io)
+[![PostgreSQL](https://shields.io)](https://postgresql.org)
+[![Architecture](https://shields.io)](#)
 
-[![React](https://img.shields.io/badge/React-19.3-61DAFB?logo=react&logoColor=white)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Vite](https://img.shields.io/badge/Vite-8.3-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
-[![Tailwind](https://img.shields.io/badge/Tailwind-4.3-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-
----
-
-## 📖 О проекте
-
-**RailOptima Launcher** — веб-приложение для инженеров-проектировщиков железных дорог. Позволяет:
-
-- 🗂️ Управлять проектами (создание, просмотр, редактирование)
-- 📊 Смотреть дашборд с аналитикой
-- 💬 Общаться с ИИ-ассистентом по нормативам (СНиП/ГОСТ)
-- 🔗 Синхронизировать данные с десктоп-клиентом на Unreal Engine
-
-**Стек:** React 19 + TypeScript + Vite 8 + Tailwind v4.
+Высокопроизводительное и отказоустойчивое **REST API** для экосистемы **RailOptima**, разработанное на передовом технологическом стеке **2026 года**. Служит единым «мозгом» и точкой входа для интерактивного веб-интерфейса (**React**) и расчетно-визуализационного комплекса (**Unity**).
 
 ---
 
-## ⚡ Быстрый старт
+## 🗺️ Архитектура системы
 
-### ⚠️ ВАЖНО
+Проект спроектирован по принципу **модульного монолита (Modular Monolith)** с жесткой изоляцией контекстов. Каждый бизнес-модуль (`AUTH`, `PROJECT`, `LLM`) независим, общается с другими модулями исключительно через плоские DTO (Java Records) и идентификаторы (UUIDv7), что гарантирует бесшовный распил на микросервисы при росте нагрузок.
 
-**После `git clone` обязательно выполните `pnpm install`** — без этого проект **не запустится**. Git не хранит `node_modules/` — зависимости устанавливаются отдельно.
+```text
+┌─────────────────────────────────────────────────────────────────────┐
+│                         КЛИЕНТЫ (Frontend)                         │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  [React-сайт (v19)]                 [Unity-клиент (C#)]             │
+│  • Дашборд проектов                 • 3D-визуализация путей         │
+│  • Чат с ИИ                         • Расчеты смет                  │
+│  • Авторизация                      • Экспорт отчетов               │
+│         │                                  │                        │
+│         └─────────────────┬────────────────┘                        │
+│                           │ (REST API + JWT)                        │
+│                           ▼                                         │
+└─────────────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│                       БЭКЕНД (RailOptima API)                       │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  МОДУЛЬНЫЙ МОНОЛИТ (Java 25 + Spring Boot 4.1.1)                    │
+│                                                                     │
+│  ┌─────────────┐       ┌─────────────┐       ┌───────────────────┐  │
+│  │    AUTH     │       │   PROJECT   │       │        LLM        │  │
+│  │ (Stateless) │       │   (CRUD)    │       │ (DeepSeek/Ollama) │  │
+│  └─────────────┘       └─────────────┘       └─────────┬─────────┘  │
+│                                                        │            │
+│  ┌─────────────────────────────────────────────────────┴─────────┐  │
+│  │          COMMON (ApiResponse, PageResponse, Exceptions)      │  │
+│  └───────────────────────────────────────────────────────────────┘  │
+│                         │                         │                 │
+│                         ▼                         ▼                 │
+│              ┌─────────────────┐       ┌─────────────────────┐      │
+│              │  PostgreSQL 18  │       │   Внешний LLM API   │      │
+│              │(Локально/Облако)│       │    (HTTP-клиент)    │      │
+│              └─────────────────┘       └─────────────────────┘      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+
+## 🛠️ Технологический стек и версии
+
+Проект использует строго зафиксированные **LTS (Long Term Support)** версии плагинов и инфраструктуры, обеспечивающие максимальную производительность ввода-вывода (Async I/O) и безопасность данных.
+
+### Компоненты и платформы
+
+| Компонент | Технология | Версия / Спецификация | Описание |
+| :--- | :--- | :--- | :--- |
+| **Бэкенд-платформа** | Java | **25 (LTS)** | Сборка под новейшую виртуальную машину |
+| **Фреймворк** | Spring Boot | **4.1.1 (LTS)** | Ядро монолита, управление бинами |
+| **База данных** | PostgreSQL | **18-alpine (LTS)** | Нативная поддержка UUIDv7, высокая скорость индексации |
+| **Веб-клиент** | React + TypeScript | **19** | Асинхронные Server Actions, рендеринг дашбордов |
+| **Десктоп-движок** | Unity + C# | **2022 LTS** | 3D-моделирование и расчет сметной стоимости |
+
+### Зависимости и Maven-плагины (`pom.xml`)
+* **Spring Boot Starter Security / Data JPA / Web / Validation** — версия `4.1.1`
+* **io.jsonwebtoken (JJWT API, Impl, Jackson)** — версия `0.13.0` (Современный бессессионный JWT)
+* **org.projectlombok (Lombok)** — управляемая версия от родительского стартера
+* **Gradle** — версия `9.8.0` (Идеальная поддержка генерации байт-кода под Java 25)
 
 ---
 
-### 1️⃣ Требования
+## 📊 Что реализовано на текущем этапе
 
-| Инструмент | Версия | Как проверить |
-| :--- | :--- | :--- |
-| **Node.js** | 22+ | `node --version` |
-| **pnpm** | 9+ | `pnpm --version` |
-| **Git** | 2.30+ | `git --version` |
+На данный момент заложен железобетонный фундамент архитектуры и полностью закрыты два ключевых слоя:
 
-**Если Node.js не установлен:**
+### 1. Единый модуль `COMMON` (Стандартизация API)
+* **`ApiResponse<T>` & `PageResponse<T>`:** Реализованы на базе иммутабельных **Java Records**. Контракт ответов строго зафиксирован. Временные метки используют глобальный стандарт **`Instant` (UTC ISO-8601)**, что решает проблему часовых поясов серверов и гарантирует безотказный парсинг дат в JS (React) и C# (Unity).
+* **`GlobalExceptionHandler`:** Централизованный перехватчик. Автоматически транслирует системные сбои и ошибки валидации полей (`@Valid`) в предсказуемый формат ответов с корректными HTTP-статусами.
+* **Иерархия бизнес-исключений:** Созданы расширяемые классы доменных ошибок (`ConflictException` ➔ 409, `ForbiddenException` ➔ 403, `ResourceNotFoundException` ➔ 404, `ValidationException` ➔ 400), снабженные строковыми кодами ошибок (`errorCode`) для локализации на клиентах.
+* **Security & CORS:** В `SecurityConfig` настроен современный декларативный CORS с кэшированием предзапросов браузера (`maxAge(3600)`), отсекающий лишнюю нагрузку. Включено хэширование паролей промышленным стандартом `BCrypt` с силой раунда `12`.
 
-```bash
-# Linux / macOS
-curl -fsSL https://fnm.vercel.app/install | bash
-source ~/.bashrc
-fnm install 22
-fnm use 22
+### 2. Слой данных и контрактов модулей `AUTH` и `PROJECT`
+* **`JwtTokenProvider` & `JwtAuthenticationFilter`:** Написаны на базе чистого API JJWT 0.13.0. Реализуют полностью **Stateless-подход**: UUID пользователя зашивается прямо в токен, позволяя бэкенду авторизовать запросы мгновенно без единого похода в базу данных.
+* **Сущности и Индексы:** Написаны JPA-модели `User` и `Project`. Таблицы оптимизированы составными индексами (`idx_user_email`, `idx_project_owner`, `idx_project_created_at`) под мгновенную выдачу постраничных списков дашборда.
+* **Контракты обмена (DTO):** Прописаны рекорды-запросы (`ProjectCreateRequest`, `RegisterRequest` и др.). Команда фронтенда и Unity уже имеет на руках готовые интерфейсы JSON для полной интеграции.
 
-# Windows
-# Скачайте с https://nodejs.org
-Если pnpm не установлен:
+---
 
-bash
-corepack enable
-corepack prepare pnpm@latest --activate
-2️⃣ Клонирование
-bash
-git clone https://github.com/xxGonzalesxx/railoptima-launcher.git
-cd railoptima-launcher
-3️⃣ Установка зависимостей
-Это обязательный шаг! ⚠️
+## 🚀 Планы на ближайшее будущее (Что реализуем далее)
 
-bash
-pnpm install
-Что произойдёт:
+Разработка продолжается строго по шагам «сверху вниз» для обеспечения наивысшего рантайм-качества:
 
-📥 Скачаются ~500 МБ зависимостей (React, Vite, Tailwind и др.)
+### 🔹 Ближайшие шаги (Модуль `PROJECT` и запуск ядра):
+1. **Реализация `ProjectService` и `ProjectController`:** Написание бизнес-логики CRUD-операций для проектов, внедрение пагинации и жесткой проверки прав собственности (один юзер не может менять проекты другого).
+2. **Инфраструктурный запуск:** Поднятие локального контейнера PostgreSQL 18 через `docker-compose.yml`, первый запуск бэкенда и тестирование сквозных сценариев (Регистрация ➔ Получение JWT ➔ Создание проекта с токеном) через Postman/HTTP-клиент.
+3. **Мониторинг:** Настройка Spring Boot Actuator эндпоинтов (`/actuator/health`) для интеграции с системами контроля работоспособности.
 
-📁 Создастся node_modules/
-
-🔒 Установятся точные версии из pnpm-lock.yaml
-
-⏱️ Время: 30-60 секунд
-
-Если нужно одобрить сборку esbuild:
-
-bash
-pnpm approve-builds
-# Стрелками выберите esbuild → Space → Enter
-4️⃣ Запуск
-bash
-pnpm dev
-Откройте в браузере: http://localhost:5173
-
-Готово! 🎉
-
-🛠 Доступные команды
-Команда	Что делает	Когда использовать
-pnpm dev	Запускает dev-сервер с HMR	Во время разработки
-pnpm build	Собирает production-билд в dist/	Перед деплоем
-pnpm preview	Просмотр production-билда локально	После build
-pnpm lint	Проверяет код через Oxlint	Перед коммитом
-pnpm test	Запускает тесты (Vitest)	Перед коммитом
-📦 Стек и зависимости
-🎨 Runtime (dependencies)
-Пакет	Версия	Назначение
-react	^19.3.0	UI-библиотека
-react-dom	^19.3.0	React для браузера
-@tanstack/react-router	^1.170.39	Типизированная маршрутизация
-@tanstack/react-query	^5.103.2	Кэш запросов и синхронизация с API
-zustand	^5.0.15	Лёгкий state-менеджер
-react-hook-form	^7.88.0	Работа с формами
-zod	^4.6.5	Валидация данных
-axios	^1.20.0	HTTP-клиент
-🛠 Dev-зависимости (devDependencies)
-Пакет	Версия	Назначение
-vite	^8.3.0	Сборщик нового поколения (Rolldown)
-@vitejs/plugin-react	^6.1.1	React-плагин для Vite
-typescript	~6.0.2	Язык + компилятор
-oxlint	^1.85.0	Быстрый линтер на Rust
-tailwindcss	^4.3.3	CSS-фреймворк
-@tailwindcss/vite	^4.3.3	Плагин Tailwind для Vite
-orval	^8.37.0	Генератор API-клиента из Swagger
-vitest	^5.0.1	Быстрый тест-раннер
-@testing-library/react	^16.3.3	Тесты React-компонентов
-@types/node	^24.13.5	Типы Node.js
-@types/react	^19.3.0	Типы React
-@types/react-dom	^19.3.0	Типы React DOM
-🔄 Полная команда установки
-Если нужно установить всё с нуля:
-
-bash
-# Runtime
-pnpm add react react-dom \
-  @tanstack/react-router @tanstack/react-query \
-  zustand react-hook-form zod axios
-
-# Dev
-pnpm add -D vite @vitejs/plugin-react typescript oxlint \
-  tailwindcss @tailwindcss/vite \
-  orval vitest @testing-library/react \
-  @types/node @types/react @types/react-dom
-После этого:
-
-bash
-pnpm approve-builds
-pnpm dev
-📁 Структура проекта
-text
-railoptima-launcher/
-├── public/                 # Статические файлы (favicon, robots.txt)
-├── src/                    # Исходный код
-│   ├── main.tsx            # Точка входа
-│   ├── App.tsx             # Корневой компонент
-│   ├── index.css           # Глобальные стили + Tailwind
-│   └── vite-env.d.ts       # Типы Vite
-├── index.html              # HTML-шаблон
-├── package.json            # Манифест проекта
-├── pnpm-lock.yaml          # Точные версии зависимостей
-├── tsconfig.json           # Конфиг TypeScript
-├── vite.config.ts          # Конфиг Vite
-├── .oxlintrc.json          # Конфиг линтера
-├── .gitignore              # Что НЕ коммитить
-└── README.md               # Этот файл
-⚠️ Обратите внимание:
-
-node_modules/ не хранится в Git — устанавливается через pnpm install
-
-dist/ не хранится в Git — создаётся через pnpm build
-
-pnpm-lock.yaml в Git — обеспечивает одинаковые версии у всех
-
-🎯 Стек — почему именно это
-Технология	Почему выбрана
-React 19.3	Актуальный, с React Compiler
-TypeScript 6.0	Стабильный (не 7.0 — там ломается Oxlint)
-Vite 8.3	Rolldown внутри — 10-30× быстрее сборки
-Oxlint 1.85	В 50-100× быстрее ESLint
-Tailwind v4.3	CSS-first, движок Oxide
-TanStack Router	End-to-end типизация
-TanStack Query v5	Кэш «из коробки»
-Orval 8.37	Генерация API из Swagger бэкенда
-Zustand 5	Простой, быстрый state
-Zod 4	Валидация + типы
-🔗 Связка с Backend
-Backend (RailOptima API) — отдельный проект на Java 25 + Spring Boot 4.1.
-
-Компонент	URL в dev	URL в prod
-Frontend	http://localhost:3000	https://app.railoptima.ru
-Backend	http://localhost:8080	https://api.railoptima.ru
-Прокси в dev: Vite автоматически проксирует /api/* → http://localhost:8080.
-
-Генерация API-клиента (Orval):
-
-bash
-# Убедитесь, что backend запущен на :8080
-pnpm orval
-Сгенерированные типы и хуки появятся в src/api/generated/.
-
-🐛 Решение проблем
-❌ pnpm: команда не найдена
-bash
-corepack enable
-corepack prepare pnpm@latest --activate
-❌ Cannot find module 'vite'
-Забыли установить зависимости:
-
-bash
-pnpm install
-❌ Error: Cannot find module ...
-Удалить node_modules и переустановить:
-
-bash
-rm -rf node_modules pnpm-lock.yaml
-pnpm install
-❌ ERR_PNPM_IGNORED_BUILDS
-Одобрить сборку:
-
-bash
-pnpm approve-builds
-# Выбрать esbuild стрелками → Space → Enter
-❌ Порт 5173 занят
-Vite автоматически предложит другой порт. Или:
-
-bash
-pnpm dev --port 3000
-❌ Ошибки TypeScript
-Проверьте версию:
-
-bash
-pnpm list typescript
-# Должно быть 6.0.3
-Если 7.0 — откатитесь:
-
-bash
-pnpm add -D typescript@~6.0.2
-Причина: TS 7.0 ломает Oxlint и другие тулы.
+### 🔹 Перспективные шаги (Модуль `LLM` и Продакшен):
+1. **Интеграция ИИ (`llm`):** Создание сервисного слоя для работы с внешними LLM-провайдерами (**DeepSeek API** для глобального облака или локальный запуск через **Ollama**). Реализация контекстного чата-помощника для автоматического расчета строительных смет.
+2. **Локализация ошибок:** Наполнение карты `validationErrors` в ответах, чтобы React-формы могли подсвечивать конкретные некорректно заполненные инпуты.
+3. **Облачная миграция БД:** Перевод пропертис `application.yml` на чтение переменных окружения для безопасного бесшовного переключения бэкенда на облачные базы данных (**Neon.tech** / **Supabase** / **Yandex Cloud**) с обязательным шифрованием трафика (`sslmode=require`).
+4. **Базы данных под ключ:** Внедрение системы миграций (**Liquibase** или
