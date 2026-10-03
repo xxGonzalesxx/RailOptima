@@ -75,7 +75,7 @@ tasks.withType<Test> {
 }
 
 tasks.withType<org.springframework.boot.gradle.tasks.run.BootRun> {
-    val envFile = file("Backend/.env")   // ← было ".env"
+    val envFile = rootProject.file(".env")
     if (envFile.exists()) {
         envFile.readLines().forEach { line ->
             if (line.isNotBlank() && !line.startsWith("#") && line.contains("=")) {
