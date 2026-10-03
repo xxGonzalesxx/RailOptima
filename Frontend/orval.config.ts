@@ -14,7 +14,7 @@ export default defineConfig({
       override: {
         mutator: {
           path: './src/lib/axios.ts',
-          name: 'api',
+          name: 'customInstance',
         },
         // ⬇️ ВАЖНО: указать какие операции — mutation
         operations: {

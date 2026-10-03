@@ -32,4 +32,7 @@ Thumbs.db
 # ---- Frontend ----
 Frontend/node_modules/
 Frontend/dist/
-Frontend/api/generated/
+
+# ---- Frontend generated ----
+Frontend/src/api/generated/
+Frontend/swagger.json
