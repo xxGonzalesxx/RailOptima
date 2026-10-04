@@ -277,8 +277,6 @@ openssl rand -hex 16      # POSTGRES_PASSWORD
 
 ## 📄 Лицензия
 
-Приватный учебный/хакатон-проект. Все права защищены.
-
 <div align="center">
 
 Сделано с 🚂 командой RailOptima
