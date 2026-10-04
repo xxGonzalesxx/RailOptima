@@ -1,13 +1,131 @@
-# 🚂 RailOptima
+<div align="center">
 
-[![Java](https://img.shields.io/badge/Java-25_LTS-orange)](https://openjdk.org)
-[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1.1-brightgreen)](https://spring.io)
-[![Gradle](https://img.shields.io/badge/Gradle-9.8-02303A)](https://gradle.org)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18--alpine-336791)](https://postgresql.org)
-[![React](https://img.shields.io/badge/React-19-61DAFB)](https://react.dev)
-[![Vite](https://img.shields.io/badge/Vite-8-646CFF)](https://vite.dev)
+# 🚄 RailOptima
 
-Монорепозиторий проекта **RailOptima** — высокопроизводительной платформы для управления железнодорожными проектами. Включает REST API (Spring Boot), веб-интерфейс (React + Vite) и задел под Unity-клиент (3D-визуализация).
+**Платформа проектирования железнодорожных трасс: 3D-клиент, веб-интерфейс и единый API**
+
+[![Java](https://img.shields.io/badge/Java-25_LTS-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-4.1.1-6DB33F?logo=springboot&logoColor=white)](https://spring.io)
+[![Gradle](https://img.shields.io/badge/Gradle-9.8-02303A?logo=gradle&logoColor=white)](https://gradle.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-336791?logo=postgresql&logoColor=white)](https://postgresql.org)
+[![React](https://img.shields.io/badge/React-19.3-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?logo=typescript&logoColor=white)](https://typescriptlang.org)
+[![Vite](https://img.shields.io/badge/Vite-8.3-646CFF?logo=vite&logoColor=white)](https://vite.dev)
+[![Unreal Engine](https://img.shields.io/badge/Unreal_Engine-5-313131?logo=unrealengine&logoColor=white)](https://unrealengine.com)
+[![License](https://img.shields.io/badge/License-Private-red)]()
+
+[Быстрый старт](#-быстрый-старт) · [Архитектура](#-архитектура) · [Стек](#-технологический-стек) · [API](#-api) · [Roadmap](#-roadmap)
+
+</div>
+
+---
+
+## 💡 О проекте
+
+**RailOptima** — связка из трёх продуктов на одном бэкенде:
+
+| Клиент | Технологии | Назначение |
+|---|---|---|
+| 🖥️ **Десктоп-клиент** | Unreal Engine 5 + C++ | 3D-проектирование трассы: загрузка рельефа, A\*-поиск оптимального пути, расчёт стоимости по типу грунта и уклону |
+| 🌐 **Веб-платформа** | React 19 + TypeScript | Регистрация, управление проектами, публичный лендинг с демонстрацией алгоритмов |
+| ⚙️ **REST API** | Spring Boot 4 (Java 25) | Единый источник правды: аутентификация, хранение проектов, в будущем — LLM-консультант по СНиП/ГОСТ |
+
+Оба клиента говорят с одним и тем же API — поэтому проект, начатый в 3D-клиенте, виден в вебе и наоборот.
+
+---
+
+## 🏛️ Архитектура
+
+```mermaid
+flowchart TB
+    subgraph Clients["Клиенты"]
+        direction LR
+        Unreal["🖥️ Unreal Engine + C++<br/>A* pathfinding · 3D-рельеф"]
+        Web["🌐 React 19 + TypeScript<br/>Лендинг · Dashboard · Auth"]
+    end
+
+    subgraph API["REST API — Spring Boot 4 (Java 25)"]
+        direction TB
+        Auth["AUTH<br/>JWT · BCrypt"]
+        Project["PROJECT<br/>CRUD · пагинация · optimistic locking"]
+        LLM["LLM <i>(план)</i><br/>СНиП/ГОСТ консультант"]
+        Common["COMMON<br/>ApiResponse · GlobalExceptionHandler"]
+    end
+
+    DB[("PostgreSQL 18<br/>Flyway-миграции")]
+    External[("Внешний LLM API<br/>GigaChat / YandexGPT")]
+
+    Unreal -->|HTTPS + JWT| API
+    Web -->|HTTPS + JWT| API
+    Auth --> DB
+    Project --> DB
+    LLM -.-> External
+
+    style Unreal fill:#313131,color:#fff
+    style Web fill:#0d1117,color:#61DAFB,stroke:#61DAFB
+    style API fill:#0d1117,color:#6DB33F,stroke:#6DB33F
+    style DB fill:#0d1117,color:#336791,stroke:#336791
+```
+
+**Backend** — модульный монолит: `auth`, `project`, `common` изолированы, общаются через DTO-рекорды и UUID, без прямых зависимостей между модулями.
+
+---
+
+## 📦 Технологический стек
+
+<details>
+<summary><strong>⚙️ Backend</strong></summary>
+
+| Компонент | Технология | Версия |
+|---|---|---|
+| Язык | Java (LTS) | 25 |
+| Фреймворк | Spring Boot | 4.1.1 (Spring 7.0.9) |
+| Сборка | Gradle (Kotlin DSL) | 9.8.0 |
+| БД | PostgreSQL | 18-alpine |
+| Миграции | Flyway | из Spring Boot BOM |
+| Аутентификация | JWT (JJWT) | 0.13.0, TTL 2 часа |
+| Хеширование паролей | BCrypt | cost factor 12 |
+| OpenAPI/Swagger | springdoc-openapi | 3.x |
+| ORM | Hibernate / Spring Data JPA | — |
+
+</details>
+
+<details>
+<summary><strong>🌐 Frontend</strong></summary>
+
+| Компонент | Технология | Версия |
+|---|---|---|
+| UI-библиотека | React | 19.3 |
+| Язык | TypeScript | 6.0.3 |
+| Сборщик | Vite (Rolldown) | 8.3 |
+| Стили | Tailwind CSS | 4.3.3 |
+| Серверное состояние | TanStack Query | 5.103 |
+| Роутинг | TanStack Router | 1.170 |
+| Клиентское состояние | Zustand | 5.0.15 |
+| Формы и валидация | React Hook Form + Zod | 7.88 / 4.6.5 |
+| Генерация API-клиента | Orval (OpenAPI → React Query) | 8.37 |
+| 3D-визуализация | three.js + @react-three/fiber | — |
+| Анимации | motion (ex-Framer Motion) | — |
+| Пакетный менеджер | pnpm | 12 |
+
+> JWT хранится **в памяти** (замыкание модуля), не в `localStorage` — снижает риск кражи токена через XSS.
+
+</details>
+
+<details>
+<summary><strong>🖥️ Десктоп-клиент</strong></summary>
+
+| Компонент | Реализация |
+|---|---|
+| Движок | Unreal Engine 5, C++ |
+| Поиск пути | A\* с собственной бинарной кучей, `UpdatePriority` за O(log n) |
+| Рельеф | Генерация из 16-битных PNG heightmap |
+| Типы грунта | 9 типов (`ERailGroundType`): 4 базовых + 5 расширенных |
+| Формула стоимости | `Длина × (1 + \|Уклон\| × 0.1) × Коэф_грунта × (1 + 0.5 × (Угол/90)²)` |
+| Ограничения | Диагонали с проверкой cut corners, запретные зоны (город, заповедник) |
+| Бенчмарк | 512×512 сетка — путь найден за **66 мс** (критерий ТЗ: < 1 сек) |
+
+</details>
 
 ---
 
@@ -15,52 +133,38 @@
 
 ```text
 RailOptima/
-├── Backend/                    # Spring Boot приложение (Java 25)
+├── Backend/
 │   └── src/main/
-│       ├── java/api/           # Исходный код (auth, project, common)
-│       └── resources/          # application.yml + Flyway-миграции
-├── Frontend/                   # React + Vite + TypeScript
-│   ├── src/
-│   │   ├── api/generated/      # Orval-клиент (генерируется, не коммитится)
-│   │   ├── lib/                # axios-мутатор, jwt-хранилище
-│   │   ├── components/         # UI-компоненты (пусто — заполняется)
-│   │   ├── pages/              # Страницы (пусто — заполняется)
-│   │   ├── hooks/              # Кастомные хуки (пусто — заполняется)
-│   │   ├── services/           # Бизнес-логика (пусто — заполняется)
-│   │   ├── types/              # Общие типы (пусто — заполняется)
-│   │   └── assets/
-│   ├── orval.config.ts         # Генерация API-клиента из OpenAPI
-│   └── vite.config.ts          # Alias @/ → src/, прокси /api → :8080
-├── build.gradle.kts            # Корневой Gradle (sourceSets на Backend/src)
+│       ├── java/api/
+│       │   ├── auth/            # Регистрация, логин, JWT
+│       │   ├── project/         # CRUD проектов
+│       │   └── common/          # ApiResponse, GlobalExceptionHandler, SecurityConfig
+│       └── resources/
+│           ├── application.yml
+│           └── db/migration/    # V1 — V3 Flyway-миграции
+│
+├── Frontend/
+│   └── src/
+│       ├── api/generated/       # Orval-клиент (генерируется, не коммитится)
+│       ├── components/ui/       # Переиспользуемые примитивы (Button, TextField)
+│       ├── features/
+│       │   ├── auth/            # Формы входа/регистрации, схемы валидации
+│       │   ├── landing/         # 3D-сцена, live-калькулятор стоимости
+│       │   └── projects/        # Форма создания проекта
+│       ├── pages/                # Landing, Login, Register, Dashboard
+│       ├── routing/              # TanStack Router + защищённые маршруты
+│       ├── store/                # Zustand (auth state)
+│       └── lib/                  # axios-адаптер, jwt-хранилище
+│
+├── build.gradle.kts              # Корневой Gradle (sourceSets → Backend/src)
 ├── settings.gradle.kts
 ├── gradlew / gradlew.bat
-├── gradle/                     # Wrapper + libs.versions.toml
-├── docker-compose.yml          # PostgreSQL 18
-├── .env                        # Секреты (не в git)
-├── .env.example                # Шаблон
+├── docker-compose.yml             # PostgreSQL 18
+├── .env.example
 └── README.md
 ```
 
-> **Gradle в корне репозитория.** Все команды бэкенда (`./gradlew bootRun`, `./gradlew build`) выполняются **из корня** `RailOptima/`, а не из `Backend/`.
-
----
-
-## 🛠️ Технологический стек
-
-| Компонент | Технология | Версия |
-| :--- | :--- | :--- |
-| Бэкенд-платформа | Java (LTS) | **25** |
-| Фреймворк | Spring Boot | **4.1.1** |
-| Сборка | Gradle (Kotlin DSL) | **9.8** |
-| БД | PostgreSQL | **18-alpine** |
-| Миграции | Flyway | (из Spring Boot BOM) |
-| JWT | JJWT | **0.13.0** |
-| OpenAPI | springdoc-openapi | **3.1.1** |
-| Веб-клиент | React + TypeScript | **19 / 6.0** |
-| Сборщик фронта | Vite | **8** |
-| Генератор API-клиента | Orval | **8.37** |
-| Пакетный менеджер | pnpm | **12** |
-| Десктоп-клиент | Unity + C# | 2022 LTS (в планах) |
+> **Важно:** Gradle-команды выполняются **из корня** `RailOptima/`, фронтенд-команды — **из `Frontend/`**.
 
 ---
 
@@ -68,34 +172,26 @@ RailOptima/
 
 ### Требования
 
-- **JDK 25** (`java -version` → 25.x)
+- **JDK 25**
 - **Docker** + **Docker Compose**
-- **pnpm** (для фронта)
+- **Node.js 20+** и **pnpm 9+**
 
-### 1. Клонировать репозиторий
+### 1. Клонирование и окружение
 
 ```bash
 git clone <repo-url> RailOptima
 cd RailOptima
-```
-
-### 2. Настроить окружение
-
-```bash
 cp .env.example .env
-# Открой .env и при необходимости поменяй POSTGRES_PASSWORD, JWT_SECRET, DB_*
 ```
 
-`.env` используется **и Docker Compose** (для Postgres), **и Spring Boot** (для datasource, JWT, CORS).
-
-### 3. Поднять PostgreSQL
+### 2. База данных
 
 ```bash
 docker compose up -d
-docker compose ps   # railoptima-db должен быть Up
+docker compose ps   # railoptima-db → Up
 ```
 
-### 4. Запустить бэкенд
+### 3. Backend
 
 ```bash
 ./gradlew bootRun
@@ -103,143 +199,75 @@ docker compose ps   # railoptima-db должен быть Up
 
 Проверка:
 ```bash
-curl http://localhost:8080/actuator/health
-# {"status":"UP"}
+curl http://localhost:8080/actuator/health   # {"status":"UP"}
 ```
 
-Swagger UI: <http://localhost:8080/swagger-ui.html>
+Swagger UI: **http://localhost:8080/swagger-ui.html**
 
-Flyway автоматически применит миграции `V1__init.sql` → `V3__add_projects_owner_fk.sql` при первом запуске.
-
-### 5. Запустить фронтенд
+### 4. Генерация API-клиента для фронта
 
 ```bash
 cd Frontend
+curl -s http://localhost:8080/v3/api-docs -o swagger.json
 pnpm install
-pnpm dev
-```
-
-Открыть: <http://localhost:3000>
-
-Vite проксирует `/api/*` → `http://localhost:8080` (см. `Frontend/vite.config.ts`).
-
----
-
-## 📜 Команды
-
-### Бэкенд (из корня репозитория)
-
-| Команда | Действие |
-| :--- | :--- |
-| `./gradlew build` | Собрать jar + прогнать тесты |
-| `./gradlew clean build` | Полная пересборка |
-| `./gradlew bootRun` | Запустить приложение |
-| `./gradlew test` | Только тесты |
-
-### Frontend (из `Frontend/`)
-
-| Команда | Действие |
-| :--- | :--- |
-| `pnpm install` | Установить зависимости |
-| `pnpm dev` | Dev-сервер на `:3000` |
-| `pnpm build` | Production-сборка в `dist/` |
-| `pnpm preview` | Локальный просмотр `dist/` |
-| `pnpm lint` | Oxlint |
-| `pnpm api:generate` | Пересобрать API-клиент через Orval |
-
-### Docker
-
-| Команда | Действие |
-| :--- | :--- |
-| `docker compose up -d` | Запустить Postgres |
-| `docker compose down` | Остановить |
-| `docker compose down -v` | Остановить + удалить volume (данные БД) |
-| `docker compose logs -f postgres` | Логи БД |
-
----
-
-## 🔄 Генерация API-клиента (Orval)
-
-Orval читает OpenAPI-спеку и генерирует типизированный React Query-клиент в `Frontend/src/api/generated/`.
-
-**Способ 1 — через файл `swagger.json`** (текущий):
-
-```bash
-# Бэкенд должен быть запущен
-curl -o Frontend/swagger.json http://localhost:8080/v3/api-docs
-
-cd Frontend
 pnpm api:generate
 ```
 
-**Способ 2 — напрямую с URL** — поменять в `orval.config.ts`:
+### 5. Frontend
 
-```ts
-input: { target: 'http://localhost:8080/v3/api-docs' },
+```bash
+pnpm dev
 ```
 
-**Важно:** `Frontend/src/api/generated/` **не коммитится** (в `.gitignore`). Каждый разработчик генерирует клиент локально после `pnpm install`.
+Открыть: **http://localhost:3000**
 
 ---
 
-## 🏛️ Архитектура
+## ✅ Реализовано
 
-**Модульный монолит** с изоляцией контекстов. Каждый модуль (`auth`, `project`, `common`) независим, общается через плоские DTO (Java Records) и UUID.
+- [x] Регистрация и вход (JWT, BCrypt cost 12)
+- [x] Защищённые маршруты на фронте (редирект на `/login` без токена)
+- [x] CRUD-основа проектов: создание + список с пагинацией
+- [x] Optimistic locking (`@Version`) и FK-целостность (`owner_id`)
+- [x] Централизованная обработка ошибок (`GlobalExceptionHandler`)
+- [x] Типобезопасный API-клиент на фронте (Orval + React Query), автогенерация из живой OpenAPI-схемы
+- [x] Публичный лендинг: 3D-визуализация рельефа и маршрута, живой калькулятор стоимости по формуле из Unreal-модуля
+- [x] A\*-пайфайндинг и расчёт стоимости в десктоп-клиенте (автономно, бенчмарк пройден)
 
-```text
-┌────────────────────────────────────────────┐
-│              КЛИЕНТЫ                        │
-│  React (v19)          Unity (C#)           │
-└──────────────┬─────────────────────────────┘
-               │ REST API + JWT
-               ▼
-┌────────────────────────────────────────────┐
-│         БЭКЕНД (Spring Boot 4)             │
-│                                            │
-│  ┌────────┐  ┌─────────┐  ┌──────────┐    │
-│  │  AUTH  │  │ PROJECT │  │   LLM    │    │
-│  └────────┘  └─────────┘  └──────────┘    │
-│  ┌────────────────────────────────────┐   │
-│  │ COMMON (ApiResponse, Exceptions)    │   │
-│  └────────────────────────────────────┘   │
-└──────┬──────────────────────┬──────────────┘
-       │                      │
-       ▼                      ▼
-  PostgreSQL 18         Внешний LLM API
-```
+## 🗺️ Roadmap
 
-### Реализовано
+- [ ] Редактирование и удаление проекта на фронте (API-хуки уже сгенерированы)
+- [ ] Детальная страница проекта
+- [ ] UX для истёкшего JWT (сейчас токен тихо сбрасывается при 401)
+- [ ] Интеграция Unreal-клиента с REST API (сейчас работает автономно)
+- [ ] Модуль LLM-консультанта по СНиП/ГОСТ (GigaChat/YandexGPT — без VPN из РФ, без self-hosting)
+- [ ] Rate limiting на API
+- [ ] CI/CD
 
-**Модуль `COMMON`**
-- `ApiResponse<T>` и `PageResponse<T>` — иммутабельные Java Records, timestamp в UTC ISO-8601
-- `GlobalExceptionHandler` — централизованная обработка ошибок с корректными HTTP-статусами
-- Иерархия исключений: `ConflictException` (409), `ForbiddenException` (403), `ResourceNotFoundException` (404), `ValidationException` (400)
-- `SecurityConfig` с CORS, BCrypt (rounds=12)
+---
 
-**Модули `AUTH` + `PROJECT`**
-- Stateless JWT (JJWT 0.13.0) — UUID пользователя зашит в токен, без похода в БД на каждый запрос
-- JPA-сущности `User`, `Project` с индексами под пагинацию (`idx_user_email`, `idx_project_owner`, `idx_project_created_at`)
-- DTO-рекорды: `RegisterRequest`, `LoginRequest`, `ProjectCreateRequest`, `ProjectUpdateRequest` и др.
-- Flyway-миграции `V1`–`V3`
+## 🔌 API
 
-### В планах
+Полная интерактивная документация — в Swagger UI (`/swagger-ui.html`) после запуска бэкенда. Основные группы эндпоинтов:
 
-1. `ProjectService` и полный CRUD с проверкой прав собственности
-2. Мониторинг через Actuator
-3. Модуль `LLM` (DeepSeek API / локальный Ollama)
-4. Локализация ошибок валидации (`validationErrors` в ответах)
-5. Облачная миграция БД (Neon / Supabase / Yandex Cloud) с `sslmode=require`
+| Группа | Эндпоинты | Доступ |
+|---|---|---|
+| `auth` | `POST /api/v1/auth/register`, `POST /api/v1/auth/login` | Публичный |
+| `project` | `GET /api/v1/projects`, `POST /api/v1/projects`, `GET/PUT/DELETE /api/v1/projects/{id}` | Требует JWT |
+
+Все ответы — единый конверт `ApiResponse<T>` (`success`, `message`, `data`, `timestamp`).
 
 ---
 
 ## 🔐 Безопасность
 
-- **`.env` не коммитится** (в `.gitignore`), в репозитории только `.env.example`
-- Секреты: `POSTGRES_PASSWORD`, `JWT_SECRET`, `DB_*`
-- JWT stateless, BCrypt для паролей
-- CORS настроен через `CORS_ALLOWED_ORIGINS` в `.env`
+- `.env` никогда не коммитится — в репозитории только `.env.example`
+- Пароли — BCrypt, cost 12
+- JWT — stateless, TTL сокращён до **2 часов** (снижает риск использования токена с устаревшей ролью)
+- Пагинация ограничена (`max-page-size: 100`) — защита от DoS через `?size=999999`
+- CORS настраивается через `CORS_ALLOWED_ORIGINS` в `.env`
 
-**Перед деплоем** обязательно сгенерировать новые секреты:
+Перед реальным деплоем — сгенерировать новые секреты:
 ```bash
 openssl rand -base64 32   # JWT_SECRET
 openssl rand -hex 16      # POSTGRES_PASSWORD
@@ -247,29 +275,12 @@ openssl rand -hex 16      # POSTGRES_PASSWORD
 
 ---
 
-## 🧹 Что игнорируется Git
-
-- `build/` — артефакты Gradle
-- `.gradle/` — кэш Gradle
-- `.idea/`, `*.iml` — IntelliJ
-- `Frontend/node_modules/`, `Frontend/dist/`
-- `Frontend/swagger.json`
-- `Frontend/src/api/generated/`
-- `.env`
-
----
-
-## 📌 Соглашения
-
-- **Java-код** — только в `Backend/src/main/java/api/...`
-- **Gradle-задачи** — запускаются из корня
-- **Фронтенд-команды** — из `Frontend/`
-- **DTO** — Java Records, не классы
-- **Даты** — только `Instant` (UTC)
-- **UUID** — версия 7 (time-ordered)
-
----
-
 ## 📄 Лицензия
 
-Приватный проект. Все права защищены.
+Приватный учебный/хакатон-проект. Все права защищены.
+
+<div align="center">
+
+Сделано с 🚂 командой RailOptima
+
+</div>

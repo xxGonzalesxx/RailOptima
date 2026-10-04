@@ -2,13 +2,12 @@
 import axios, { type AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
 import { tokenStore } from './jwt'
 
-export const api = axios.create({
-  baseURL: '/api/v1',
+const axiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
   timeout: 30_000,
 })
 
-api.interceptors.request.use(
+axiosInstance.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = tokenStore.get()
     if (token) config.headers.Authorization = `Bearer ${token}`
@@ -17,7 +16,7 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
-api.interceptors.response.use(
+axiosInstance.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) tokenStore.clear()
@@ -25,9 +24,6 @@ api.interceptors.response.use(
   },
 )
 
-/**
- * Orval-мутатор: fetch-подобная сигнатура, возвращает распакованные данные.
- */
 export const customInstance = async <T>(
   url: string,
   options?: RequestInit & { params?: Record<string, unknown> },
@@ -41,7 +37,7 @@ export const customInstance = async <T>(
     signal: options?.signal ?? undefined,
   }
 
-  const response = await api.request<T>(config)
+  const response = await axiosInstance.request<T>(config)
   return response.data
 }
 

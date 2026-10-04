@@ -24,13 +24,11 @@ export default defineConfig({
           create:   { query: { useQuery: false, useMutation: true } },
           update:   { query: { useQuery: false, useMutation: true } },
           delete:   { query: { useQuery: false, useMutation: true } },
-          // GET-запросы → useQuery (остаются по умолчанию)
         },
         query: {
-          useQuery: true,
-          useMutation: true,
-          signal: true,
-        },
+            useQuery: true,
+            signal: true,
+                },
       },
     },
   },
