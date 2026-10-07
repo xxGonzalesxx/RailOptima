@@ -1,0 +1,9 @@
+spring:
+  ai:
+    openai:
+      base-url: https://api.giga.chat
+
+# Ваши параметры авторизации, считываемые интерцептором из .env файла
+gigachat:
+  auth-key: ${GIGACHAT_AUTH_KEY:}
+  scope: ${GIGACHAT_SCOPE:GIGACHAT_API_PERS}
