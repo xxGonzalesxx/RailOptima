@@ -1,24 +1,16 @@
 package api.llm.config;
 
 import org.springframework.http.HttpRequest;
+import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.http.MediaType;
+import org.springframework.lang.NonNull;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
-import org.springframework.lang.NonNull;
 
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
 import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 import java.util.Map;
 import java.util.UUID;
 
@@ -26,17 +18,23 @@ public class GigaChatAuthInterceptor implements ClientHttpRequestInterceptor {
 
     private final String authKey;
     private final String scope;
-    private String cachedAccessToken;
-    private long tokenExpiryTime = 0;
+    private final RestClient authClient;
 
-    public GigaChatAuthInterceptor(String authKey, String scope) {
+    private volatile String cachedAccessToken;
+    private volatile long tokenExpiryTime = 0;
+
+    public GigaChatAuthInterceptor(String authKey, String scope, RestClient.Builder authClientBuilder) {
         this.authKey = authKey;
         this.scope = scope;
+        this.authClient = authClientBuilder
+                .baseUrl("https://ngw.devices.sberbank.ru:9443/api/v2")
+                .build();
     }
 
     @Override
     @NonNull
-    public ClientHttpResponse intercept(@NonNull HttpRequest request, @NonNull byte[] body, @NonNull ClientHttpRequestExecution execution) throws IOException {
+    public ClientHttpResponse intercept(@NonNull HttpRequest request, @NonNull byte[] body,
+                                        @NonNull ClientHttpRequestExecution execution) throws IOException {
         if (cachedAccessToken == null || System.currentTimeMillis() >= tokenExpiryTime) {
             refreshAccessToken();
         }
@@ -45,36 +43,10 @@ public class GigaChatAuthInterceptor implements ClientHttpRequestInterceptor {
     }
 
     private synchronized void refreshAccessToken() {
+        if (cachedAccessToken != null && System.currentTimeMillis() < tokenExpiryTime) {
+            return; // другой поток уже обновил, пока мы ждали на synchronized
+        }
         try {
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, new TrustManager[]{new X509TrustManager() {
-                @Override
-                public X509Certificate[] getAcceptedIssuers() {
-                    return new X509Certificate[0];
-                }
-                @Override
-                public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-                @Override
-                public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-            }}, new SecureRandom());
-
-            HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
-
-            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory() {
-                @Override
-                protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
-                    if (connection instanceof HttpsURLConnection httpsConnection) {
-                        httpsConnection.setSSLSocketFactory(sslContext.getSocketFactory());
-                    }
-                    super.prepareConnection(connection, httpMethod);
-                }
-            };
-
-            RestClient authClient = RestClient.builder()
-                    .requestFactory(requestFactory)
-                    .baseUrl("https://ngw.devices.sberbank.ru:9443/api/v2")
-                    .build();
-
             MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
             formData.add("scope", scope);
 
@@ -88,14 +60,20 @@ public class GigaChatAuthInterceptor implements ClientHttpRequestInterceptor {
                     .retrieve()
                     .body(Map.class);
 
-            if (response != null && response.containsKey("access_token")) {
-                this.cachedAccessToken = (String) response.get("access_token");
-                this.tokenExpiryTime = System.currentTimeMillis() + (25 * 60 * 1000);
-            } else {
-                throw new RuntimeException("Сбербанк прислал пустой ответ при генерации токена");
+            if (response == null || !response.containsKey("access_token")) {
+                throw new IllegalStateException("GigaChat OAuth вернул пустой ответ");
             }
+
+            this.cachedAccessToken = (String) response.get("access_token");
+
+            // expires_at приходит как unix-время в мс; если вдруг отсутствует — fallback на 25 минут
+            Object expiresAt = response.get("expires_at");
+            this.tokenExpiryTime = (expiresAt instanceof Number n)
+                    ? n.longValue() - 60_000 // обновляем на минуту раньше реального истечения
+                    : System.currentTimeMillis() + (25 * 60 * 1000);
+
         } catch (Exception e) {
-            throw new RuntimeException("Сбой Сбер OAuth шлюза: " + e.getMessage(), e);
+            throw new IllegalStateException("Не удалось получить токен GigaChat OAuth", e);
         }
     }
 }

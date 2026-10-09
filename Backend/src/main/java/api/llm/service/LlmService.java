@@ -1,98 +1,60 @@
 package api.llm.service;
 
-import api.llm.config.GigaChatAuthInterceptor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.security.SecureRandom;
-import java.security.cert.X509Certificate;
 import java.util.List;
 import java.util.Map;
 
 @Service
 public class LlmService {
 
+    private static final Logger log = LoggerFactory.getLogger(LlmService.class);
+
     private final RestClient gigaChatClient;
+    private final String model;
 
-    public LlmService(
-            @Value("${gigachat.auth-key}") String gigachatAuthKey,
-            @Value("${gigachat.scope}") String gigachatScope) {
-
-        try {
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            sslContext.init(null, new TrustManager[]{new X509TrustManager() {
-                @Override
-                public X509Certificate[] getAcceptedIssuers() {
-                    return new X509Certificate[0];
-                }
-                @Override
-                public void checkClientTrusted(X509Certificate[] certs, String authType) {}
-                @Override
-                public void checkServerTrusted(X509Certificate[] certs, String authType) {}
-            }}, new SecureRandom());
-
-            HttpsURLConnection.setDefaultHostnameVerifier((hostname, session) -> true);
-
-            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory() {
-                @Override
-                protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
-                    if (connection instanceof HttpsURLConnection httpsConnection) {
-                        httpsConnection.setSSLSocketFactory(sslContext.getSocketFactory());
-                    }
-                    super.prepareConnection(connection, httpMethod);
-                }
-            };
-
-            this.gigaChatClient = RestClient.builder()
-                    .baseUrl("https://api.giga.chat")
-                    .requestFactory(requestFactory)
-                    .requestInterceptor(new GigaChatAuthInterceptor(gigachatAuthKey, gigachatScope))
-                    .build();
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize GigaChat client", e);
-        }
+    public LlmService(RestClient gigaChatClient, @Value("${gigachat.model}") String model) {
+        this.gigaChatClient = gigaChatClient;
+        this.model = model;
     }
 
     @SuppressWarnings("unchecked")
     public String ask(String question) {
-        try {
-            Map<String, Object> requestBody = Map.of(
-                    "model", "GigaChat-3-Ultra",
-                    "messages", List.of(
-                            Map.of("role", "user", "content", question)
-                    )
-            );
+        Map<String, Object> requestBody = Map.of(
+                "model", model,
+                "messages", List.of(Map.of("role", "user", "content", question))
+        );
 
-            Map<String, Object> response = gigaChatClient.post()
+        Map<String, Object> response;
+        try {
+            response = gigaChatClient.post()
                     .uri("/v1/chat/completions")
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(requestBody)
                     .retrieve()
                     .body(Map.class);
-
-            if (response != null && response.containsKey("choices")) {
-                List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
-                if (!choices.isEmpty()) {
-                    Map<String, Object> choice = choices.get(0);
-                    Map<String, Object> message = (Map<String, Object>) choice.get("message");
-                    return (String) message.get("content");
-                }
-            }
-            return "Не удалось прочитать 'choices' из ответа Сбера.";
-
-        } catch (Exception e) {
-            // Возвращаем текст реальной ошибки прямо наружу!
-            return "Детали сбоя в Java-коде: " + e.getMessage();
+        } catch (RestClientException e) {
+            log.error("Ошибка при обращении к GigaChat", e);
+            throw new IllegalStateException("GigaChat временно недоступен, попробуйте позже");
         }
+
+        if (response == null || !response.containsKey("choices")) {
+            log.warn("Неожиданный формат ответа GigaChat: {}", response);
+            throw new IllegalStateException("GigaChat вернул ответ в неожиданном формате");
+        }
+
+        List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+        if (choices.isEmpty()) {
+            throw new IllegalStateException("GigaChat вернул пустой список choices");
+        }
+
+        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+        return (String) message.get("content");
     }
 }
