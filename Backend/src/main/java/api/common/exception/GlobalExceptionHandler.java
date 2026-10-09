@@ -119,4 +119,12 @@ public class GlobalExceptionHandler {
                 request
         );
     }
+
+    // --- Ошибки интеграции с LLM (GigaChat недоступен, кривой ответ и т.п.) ---
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiResponse<Map<String, String>>> handleLlmUnavailable(
+            IllegalStateException ex, HttpServletRequest request) {
+        log.error("LLM service error on path {}: {}", request.getRequestURI(), ex.getMessage(), ex);
+        return buildErrorResponse(ex.getMessage(), "LLM_UNAVAILABLE", HttpStatus.BAD_GATEWAY, request);
+    }
 }

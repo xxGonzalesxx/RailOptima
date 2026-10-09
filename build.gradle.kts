@@ -1,7 +1,6 @@
 plugins {
     java
     id("org.springframework.boot") version "4.1.1"
-    id("io.spring.dependency-management") version "1.1.7"
 }
 
 group = "com.railoptima"
@@ -28,6 +27,12 @@ val lombokVersion = "1.18.48"
 val springdocVersion = "3.1.1"
 
 dependencies {
+    // Встроенный нативный BOM управления зависимостями Spring Boot 4.x
+    implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.1"))
+
+    // Встроенный нативный BOM управления зависимостями Spring AI 2.x
+    implementation(platform("org.springframework.ai:spring-ai-bom:2.0.1"))
+
     // Web & Validation
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -50,9 +55,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.flywaydb:flyway-database-postgresql")
 
-    // Lombok
+    // Lombok (Добавлен также в тест-контекст, чтобы у Gradle 9.x не было ворнингов при сборке тестов)
     compileOnly("org.projectlombok:lombok:$lombokVersion")
     annotationProcessor("org.projectlombok:lombok:$lombokVersion")
+    testCompileOnly("org.projectlombok:lombok:$lombokVersion")
+    testAnnotationProcessor("org.projectlombok:lombok:$lombokVersion")
 
     // Test
     testImplementation("org.springframework.boot:spring-boot-starter-test")

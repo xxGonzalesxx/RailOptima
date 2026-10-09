@@ -3,6 +3,7 @@ import { useGetMyProjects } from '@/api/generated/project-controller/project-con
 import { useAuthStore } from '@/store/authStore'
 import { useNavigate } from '@tanstack/react-router'
 import { CreateProjectForm } from '@/features/projects/CreateProjectForm'
+import { ChatWindow } from '@/features/llm/ChatWindow'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -61,6 +62,10 @@ export function DashboardPage() {
           ))}
         </ul>
       )}
+
+      <div className="fixed right-6 bottom-6">
+        <ChatWindow />
+      </div>
     </div>
   )
 }
