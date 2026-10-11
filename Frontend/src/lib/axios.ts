@@ -1,4 +1,3 @@
-// Frontend/src/lib/axios.ts
 import axios, { type AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
 import { tokenStore } from './jwt'
 
@@ -37,8 +36,18 @@ export const customInstance = async <T>(
     signal: options?.signal ?? undefined,
   }
 
-  const response = await axiosInstance.request<T>(config)
-  return response.data
+  const response = await axiosInstance.request(config)
+
+  const headers = new Headers()
+  Object.entries(response.headers ?? {}).forEach(([key, value]) => {
+    if (value !== undefined) headers.set(key, String(value))
+  })
+
+  return {
+    data: response.data,
+    status: response.status,
+    headers,
+  } as T
 }
 
 export default customInstance

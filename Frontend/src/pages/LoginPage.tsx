@@ -23,7 +23,7 @@ export function LoginPage() {
       { data },
       {
         onSuccess: (response) => {
-          const token = response.data?.token
+          const token = response.data.data?.token
           if (token) {
             login(token)
             navigate({ to: '/dashboard' })

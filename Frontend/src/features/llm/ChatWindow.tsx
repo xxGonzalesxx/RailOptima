@@ -29,7 +29,7 @@ export function ChatWindow() {
       { question },
       {
         onSuccess: (res) => {
-          setMessages((prev) => [...prev, { role: 'assistant', content: res.data.answer }])
+          setMessages((prev) => [...prev, { role: 'assistant', content: res.data.data.answer }])
         },
       },
     )

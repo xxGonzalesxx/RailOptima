@@ -4,6 +4,7 @@ import { useAuthStore } from '@/store/authStore'
 import { useNavigate } from '@tanstack/react-router'
 import { CreateProjectForm } from '@/features/projects/CreateProjectForm'
 import { ChatWindow } from '@/features/llm/ChatWindow'
+import type { ProjectResponse } from '@/api/generated/models'
 
 export function DashboardPage() {
   const navigate = useNavigate()
@@ -18,7 +19,7 @@ export function DashboardPage() {
     navigate({ to: '/login' })
   }
 
-  const projects = data?.data?.content ?? []
+  const projects = data?.data?.data?.content ?? []
 
   return (
     <div className="min-h-screen bg-[#07070a] p-8 text-white">
@@ -54,7 +55,7 @@ export function DashboardPage() {
         <p className="text-white/50">Пока нет проектов</p>
       ) : (
         <ul className="space-y-2">
-          {projects.map((p) => (
+          {projects.map((p: ProjectResponse) => (
             <li key={p.id} className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
               <div className="font-medium">{p.name}</div>
               <div className="text-sm text-white/50">{p.status}</div>

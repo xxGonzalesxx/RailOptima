@@ -4,7 +4,7 @@ export interface AskRequest {
   question: string
 }
 
-export interface AskResponse {
+ interface AskResponse {
   answer: string
 }
 
@@ -16,8 +16,14 @@ export interface ApiResponse<T> {
   path: string | null
 }
 
+export interface AskLlmResult {
+  data: ApiResponse<AskResponse>
+  status: number
+  headers: Headers
+}
+
 export function askLlm(payload: AskRequest) {
-  return customInstance<ApiResponse<AskResponse>>('/api/v1/llm/ask', {
+  return customInstance<AskLlmResult>('/api/v1/llm/ask', {
     method: 'POST',
     body: JSON.stringify(payload),
   })
