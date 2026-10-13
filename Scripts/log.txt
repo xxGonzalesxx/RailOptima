@@ -1,0 +1,31 @@
+[prepare_region] Загружен .env: C:\Projects\UE\RailOptima\Scripts\.env
+[prepare_region] Найден готовый DEM: ../RawContent\krasnodar_dem.tif
+[prepare_region] Использую существующий DEM: ../RawContent\krasnodar_dem.tif
+[prepare_region] Скачивание из OpenTopography пропущено.
+[prepare_region] bbox из GeoTIFF: {'west': 38.4998611, 'south': 44.5001389, 'east': 39.4998611, 'north': 45.5001389}
+[prepare_region] Использую bbox из GeoTIFF: {'west': 38.4998611, 'south': 44.5001389, 'east': 39.4998611, 'north': 45.5001389}
+[prepare_region] PNG уже существует: ../RawContent\heightmap.png (пропускаю конвертацию)
+[prepare_region] Читаю метаданные DEM: ../RawContent\krasnodar_dem.tif
+[prepare_region] Метаданные: {'min_elevation_m': -31.0, 'max_elevation_m': 733.0, 'pixel_size_m': 30.92, 'width': 3600, 'height': 3600}
+[prepare_region] region_meta.json сохранён.
+[prepare_region] Ищу PBF Geofabrik для bbox (38.4999, 44.5001, 39.4999, 45.5001)...
+[prepare_region] osmfinder не нашёл подходящий регион.
+[prepare_region] Перебираю федеральные округа России по списку.
+[prepare_region] Пробую регион: south-fed-district
+[prepare_region] PBF уже в кэше: ./cache\south-fed-district-latest.osm.pbf (300.5 MB)
+[prepare_region]   Проверяю, есть ли данные для bbox...
+[prepare_region]   Регион south-fed-district содержит данные для bbox.
+[prepare_region] Читаю PBF: ./cache\south-fed-district-latest.osm.pbf
+[prepare_region] Пробую get_network('driving')...
+[prepare_region]   get_network('driving'): 24737 объектов.
+[prepare_region]   Типы геометрий в данных: {'MultiLineString': 24737}
+[prepare_region]   CRS: epsg:4326
+[prepare_region]   Колонки: ['access', 'bicycle', 'bridge', 'cycleway', 'foot', 'highway', 'int_ref', 'junction', 'lanes', 'lit', 'maxspeed', 'motorcar', 'motor_vehicle', 'name', 'oneway', 'overtaking', 'psv', 'ref', 'sidewalk', 'smoothness', 'surface', 'tracktype', 'tunnel', 'turn', 'width', 'id', 'timestamp', 'version', 'tags', 'osm_type', 'geometry', 'length']
+[prepare_region]   Пример геометрии: MULTILINESTRING ((39.1613053 44.6629007, 39.163478 44.6655784), (39.163478 44.6655784, 39.1649609 44.667137))
+[prepare_region]   Оставляем линейных и площадных: 24737
+[prepare_region] Дорог: 130250 → ../RawContent\roads.geojson (96.6 MB)
+[prepare_region] Извлекаю реки (waterway in ['river', 'stream'])...
+[prepare_region]   Рек (сырых): 1917
+[prepare_region]   Типы геометрий рек: {'MultiLineString': 1533, 'LineString': 384}
+[prepare_region] Рек: 44467 → ../RawContent\rivers.geojson (14.2 MB)
+[prepare_region] Готово. Файлы в: C:\Projects\UE\RailOptima\RawContent

@@ -393,12 +393,26 @@ FRailGridData ARailOptimaGameMode::BuildGridFromTerrain(
 	FRailGridData Grid;
 	if (MapData.Width <= 1 || MapData.Height <= 1 || MapData.Heights.Num() == 0) return Grid;
 
-	const float PixelSize_m = FMath::Max(static_cast<float>(MapData.PixelSize_m), 1.0f);
-	const int32 Subsample = FMath::Max(1, FMath::RoundToInt(InTargetStep_m / PixelSize_m));
-	const float ActualStep_m = PixelSize_m * static_cast<float>(Subsample);
+	// Работаем в системе координат ЛАНДШАФТА, а не PNG.
+	// Размер карты в метрах = MeshResolution × StepSize_m.
+	const int32 TerrainRes = InTerrain.TerrainParameters.MeshResolution;
+	const float TerrainStep = InTerrain.TerrainParameters.StepSize_m;
+	const float MapSizeMeters = InTerrain.GetMapSizeMeters();
 
-	const int32 GridW = FMath::Max(2, MapData.Width / Subsample);
-	const int32 GridH = FMath::Max(2, MapData.Height / Subsample);
+	if (TerrainRes <= 1 || TerrainStep <= 0.0f || MapSizeMeters <= 0.0f)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("[RailGM] Некорректные параметры ландшафта: Resolution=%d, Step=%.2f."),
+			TerrainRes, TerrainStep);
+		return Grid;
+	}
+
+	// Сколько узлов сетки A* укладывается в размер ландшафта.
+	// Шаг сетки A* округляем к размеру ландшафта.
+	const int32 GridW = FMath::Max(2, FMath::RoundToInt(MapSizeMeters / FMath::Max(InTargetStep_m, 1.0f)));
+	const int32 GridH = GridW;
+	const float ActualStep_m = MapSizeMeters / static_cast<float>(GridW - 1);
+
 	const float ElevRange = FMath::Max(MapData.MaxElevation_m - MapData.MinElevation_m, 1.0f);
 
 	Grid.Width = GridW;
@@ -406,26 +420,32 @@ FRailGridData ARailOptimaGameMode::BuildGridFromTerrain(
 	Grid.StepSize_m = ActualStep_m;
 	Grid.Nodes.SetNum(GridW * GridH);
 
+	// Соотношение между сеткой A* и PNG (для сэмплирования высот).
+	const float ScaleX = static_cast<float>(MapData.Width - 1) / FMath::Max(GridW - 1, 1);
+	const float ScaleY = static_cast<float>(MapData.Height - 1) / FMath::Max(GridH - 1, 1);
+
 	for (int32 Y = 0; Y < GridH; ++Y)
 	{
 		for (int32 X = 0; X < GridW; ++X)
 		{
-			const int32 SrcX = FMath::Clamp(X * Subsample, 0, MapData.Width - 1);
-			const int32 SrcY = FMath::Clamp(Y * Subsample, 0, MapData.Height - 1);
+			const int32 SrcX = FMath::Clamp(FMath::RoundToInt(X * ScaleX), 0, MapData.Width - 1);
+			const int32 SrcY = FMath::Clamp(FMath::RoundToInt(Y * ScaleY), 0, MapData.Height - 1);
+
 			const float NormH = MapData.Heights[SrcY * MapData.Width + SrcX];
+			const float Height_m = MapData.MinElevation_m + NormH * ElevRange;
 
 			FRailGridNode& Node = Grid.Nodes[Grid.IndexOf(X, Y)];
 			Node.X = X;
 			Node.Y = Y;
-			Node.Height_m = MapData.MinElevation_m + NormH * ElevRange;
+			Node.Height_m = Height_m;
 			Node.GroundType = ERailGroundType::Loam;
 			Node.bIsForbidden = false;
 		}
 	}
 
 	UE_LOG(LogTemp, Log,
-		TEXT("[RailGM] Сетка: %dx%d, шаг=%.1f м (запрошено %.1f)."),
-		GridW, GridH, ActualStep_m, InTargetStep_m);
+		TEXT("[RailGM] Сетка A*: %dx%d, шаг=%.1f м, размер=%.1f км (совпадает с ландшафтом)."),
+		GridW, GridH, ActualStep_m, MapSizeMeters / 1000.0f);
 
 	return Grid;
 }

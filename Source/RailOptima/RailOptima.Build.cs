@@ -13,10 +13,15 @@ public class RailOptima : ModuleRules
             "Engine",
             "InputCore",
             "EnhancedInput",
-            "Landscape",
-            "ImageWrapper",     // загрузка PNG
-            "RenderCore",
-            "RHI",
+            "ProceduralMeshComponent",
+            "ImageWrapper",
+            "HTTP",
+            "Json",
+            "JsonUtilities",
+            "UMG",
+            "Slate",
+            "SlateCore",
+            "Projects"
         });
 
         PrivateDependencyModuleNames.AddRange(new string[]
