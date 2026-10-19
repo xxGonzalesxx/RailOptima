@@ -5,10 +5,11 @@
 
 #pragma once
 
+#include "Algorithms/AStarPathFinder.h"
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
-#include "Algorithms/AStarPathFinder.h"
 #include "RailOptimaGameMode.generated.h"
+
 
 class APathRenderer;
 class AProceduralTerrain;
@@ -46,7 +47,6 @@ class RAILOPTIMA_API ARailOptimaGameMode : public AGameModeBase
 	GENERATED_BODY()
 
 public:
-
 	ARailOptimaGameMode();
 
 	virtual void BeginPlay() override;
@@ -82,7 +82,6 @@ public:
 	FRailPathRecomputedSignature OnPathRecomputed;
 
 protected:
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Settings")
 	FRailRuntimeSettings RuntimeSettings;
 
@@ -111,7 +110,6 @@ protected:
 	float MaxViewScale = 6.0f;
 
 private:
-
 	void SetupSubsystems();
 	void FindTerrain();
 	void SetupPathRenderer();
@@ -120,7 +118,7 @@ private:
 	FRailGridData BuildGridFromTerrain(const AProceduralTerrain& InTerrain, float InTargetStep_m) const;
 	FRailGridData GenerateSyntheticGrid(int32 InSize, float InStepSize_m) const;
 
-	int32 WorldToNodeIndex(const FRailGridData& InGrid, const FVector& InWorldPos) const;
+	int32	WorldToNodeIndex(const FRailGridData& InGrid, const FVector& InWorldPos) const;
 	FVector NodeIndexToWorldXY(const FRailGridData& InGrid, int32 InNodeIndex) const;
 
 	UFUNCTION()
@@ -147,7 +145,7 @@ private:
 	TObjectPtr<ARailEndpoint> EndEndpoint;
 
 	FRailGridData CachedGrid;
-	bool bGridCached = false;
+	bool		  bGridCached = false;
 
 	FTimerHandle RecomputeTimer;
 };

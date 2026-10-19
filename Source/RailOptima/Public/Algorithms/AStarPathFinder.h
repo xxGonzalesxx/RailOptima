@@ -5,9 +5,9 @@
 
 #pragma once
 
+#include "Algorithms/CostCalculator.h"
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
-#include "Algorithms/CostCalculator.h"
 #include "AStarPathFinder.generated.h"
 
 USTRUCT(BlueprintType)
@@ -99,13 +99,12 @@ class RAILOPTIMA_API UAStarPathFinder : public UObject
 	GENERATED_BODY()
 
 public:
-
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Path")
 	FRailPathResult FindPath(
 		const FRailGridData& InGrid,
-		int32 InStartIndex,
-		int32 InEndIndex,
-		int32 InMaxExpansions = 500000);
+		int32				 InStartIndex,
+		int32				 InEndIndex,
+		int32				 InMaxExpansions = 500000);
 
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Path")
 	void SetCostCalculator(UCostCalculator* InCalculator);
@@ -114,23 +113,22 @@ public:
 	UCostCalculator* GetCostCalculator() const { return CostCalculator; }
 
 private:
-
 	void CollectNeighbors(
-		const FRailGridData& InGrid,
-		int32 InNodeIndex,
+		const FRailGridData&				InGrid,
+		int32								InNodeIndex,
 		TArray<int32, TInlineAllocator<8>>& OutNeighbors) const;
 
 	void ReconstructPath(
 		const FRailGridData& InGrid,
 		const TArray<int32>& InCameFrom,
-		int32 InStartIndex,
-		int32 InEndIndex,
-		FRailPathResult& OutResult) const;
+		int32				 InStartIndex,
+		int32				 InEndIndex,
+		FRailPathResult&	 OutResult) const;
 
 	float EvaluateEdge(
 		const FRailGridData& InGrid,
-		int32 InFromIndex,
-		int32 InToIndex,
+		int32				 InFromIndex,
+		int32				 InToIndex,
 		const TArray<int32>& InCameFrom) const;
 
 	float Heuristic(const FRailGridData& InGrid, int32 InFromIndex, int32 InToIndex) const;
@@ -139,6 +137,6 @@ private:
 	TObjectPtr<UCostCalculator> CostCalculator;
 
 	static constexpr int32 NumDirections = 8;
-	static const int32 DirectionX[NumDirections];
-	static const int32 DirectionY[NumDirections];
+	static const int32	   DirectionX[NumDirections];
+	static const int32	   DirectionY[NumDirections];
 };

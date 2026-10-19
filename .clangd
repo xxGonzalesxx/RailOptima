@@ -1,0 +1,21 @@
+CompileFlags:
+  CompilationDatabase: "C:/Projects/UE/RailOptima"
+  Add:
+    - "-Wno-unknown-pragmas"
+    - "-Wno-unused-variable"
+    - "-Wno-microsoft-include"
+    - "-Wno-invalid-token-paste"
+    - "-Wno-macro-redefined"
+    - "-D__FUNCTION__=__func__"
+  Remove:
+    - "/W4"
+    - "/we*"
+    - "/analyze*"
+    - "/experimental:*"
+
+Diagnostics:
+  UnusedIncludes: None
+  MissingIncludes: None
+  ClangTidy:
+    Remove:
+      - "*"

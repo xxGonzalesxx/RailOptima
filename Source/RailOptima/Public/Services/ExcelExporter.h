@@ -1,14 +1,15 @@
 // Copyright (c) 2026 Николайчик А.В. Все права защищены.
-// Дипломный проект 
-// «Разработка программы проектирования железнодорожных путей: модуль вызуализации», 
+// Дипломный проект
+// «Разработка программы проектирования железнодорожных путей: модуль вызуализации»,
 // ПривГУПС, 2026.
 
 #pragma once
 
 #include "CoreMinimal.h"
-#include "UObject/NoExportTypes.h"
 #include "Misc/DateTime.h"
+#include "UObject/NoExportTypes.h"
 #include "ExcelExporter.generated.h"
+
 
 // Forward-объявления C-структур libxlsxwriter.
 struct lxw_workbook;
@@ -92,7 +93,6 @@ class RAILOPTIMA_API UExcelExporter : public UObject
 	GENERATED_BODY()
 
 public:
-
 	// ─────────────────────────────────────────────────────────────────
 	//  Команды навигации
 	// ─────────────────────────────────────────────────────────────────
@@ -108,7 +108,6 @@ public:
 	bool ExportReport(const FRailRouteReport& InReport, const FString& InFilePath);
 
 private:
-
 	// ─────────────────────────────────────────────────────────────────
 	//  Внутренняя логика
 	// ─────────────────────────────────────────────────────────────────

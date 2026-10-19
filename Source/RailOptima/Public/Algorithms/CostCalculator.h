@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Николайчик А.В. Все права защищены.
-// Дипломный проект 
-// «Разработка программы проектирования железнодорожных путей: модуль вызуализации», 
+// Дипломный проект
+// «Разработка программы проектирования железнодорожных путей: модуль вызуализации»,
 // ПривГУПС, 2026.
 
 #pragma once
@@ -17,15 +17,15 @@
 UENUM(BlueprintType)
 enum class ERailGroundType : uint8
 {
-	Loam        UMETA(DisplayName = "Суглинок"),
-	Sand        UMETA(DisplayName = "Песок"),
-	Rock        UMETA(DisplayName = "Скала"),
-	Water       UMETA(DisplayName = "Вода / болото"),
-	Gravel      UMETA(DisplayName = "Гравий"),
-	Clay        UMETA(DisplayName = "Глина"),
-	Forest      UMETA(DisplayName = "Лес"),
-	City        UMETA(DisplayName = "Город"),
-	Reserve     UMETA(DisplayName = "Заповедник")
+	Loam	UMETA(DisplayName = "Суглинок"),
+	Sand	UMETA(DisplayName = "Песок"),
+	Rock	UMETA(DisplayName = "Скала"),
+	Water	UMETA(DisplayName = "Вода / болото"),
+	Gravel	UMETA(DisplayName = "Гравий"),
+	Clay	UMETA(DisplayName = "Глина"),
+	Forest	UMETA(DisplayName = "Лес"),
+	City	UMETA(DisplayName = "Город"),
+	Reserve UMETA(DisplayName = "Заповедник")
 };
 
 /**
@@ -64,7 +64,6 @@ class RAILOPTIMA_API UCostCalculator : public UObject
 	GENERATED_BODY()
 
 public:
-
 	UCostCalculator();
 
 	// ─────────────────────────────────────────────────────────────────
@@ -138,7 +137,6 @@ public:
 	FRailCostParameters Parameters;
 
 private:
-
 	// ─────────────────────────────────────────────────────────────────
 	//  Внутренняя логика
 	// ─────────────────────────────────────────────────────────────────

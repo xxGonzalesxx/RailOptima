@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Николайчик А.В. Все права защищены.
-// Дипломный проект 
-// «Разработка программы проектирования железнодорожных путей: модуль вызуализации», 
+// Дипломный проект
+// «Разработка программы проектирования железнодорожных путей: модуль визуализации»,
 // ПривГУПС, 2026.
 
 #include "Core/HeightInterpolator.h"
@@ -48,8 +48,8 @@ float UHeightInterpolator::GetHeightNormalized(float InNormX, float InNormY) con
 		return 0.0f;
 	}
 
-	const float PixelX = FMath::Clamp(InNormX, 0.0f, 1.0f) * (MapData.Width - 1);
-	const float PixelY = FMath::Clamp(InNormY, 0.0f, 1.0f) * (MapData.Height - 1);
+	const float PixelX = FMath::Clamp(InNormX, 0.0f, 1.0f) * static_cast<float>(MapData.Width - 1);
+	const float PixelY = FMath::Clamp(InNormY, 0.0f, 1.0f) * static_cast<float>(MapData.Height - 1);
 
 	return SampleBilinear(PixelX, PixelY);
 }
@@ -84,7 +84,7 @@ float UHeightInterpolator::GetSlopeRatio(const FVector& InFrom, const FVector& I
 	const float HeightTo = GetHeightWorld(InTo);
 
 	const FVector2D DeltaXY(InTo.X - InFrom.X, InTo.Y - InFrom.Y);
-	const float DistanceXY = DeltaXY.Size();
+	const float		DistanceXY = DeltaXY.Size();
 
 	if (DistanceXY < KINDA_SMALL_NUMBER)
 	{
@@ -141,6 +141,6 @@ FVector2D UHeightInterpolator::WorldToPixel(const FVector& InWorldLocation) cons
 	const float NormY = (InWorldLocation.Y - WorldOrigin.Y) / WorldSizeXY.Y;
 
 	return FVector2D(
-		FMath::Clamp(NormX, 0.0f, 1.0f) * (MapData.Width - 1),
-		FMath::Clamp(NormY, 0.0f, 1.0f) * (MapData.Height - 1));
+		FMath::Clamp(NormX, 0.0f, 1.0f) * static_cast<float>(MapData.Width - 1),
+		FMath::Clamp(NormY, 0.0f, 1.0f) * static_cast<float>(MapData.Height - 1));
 }

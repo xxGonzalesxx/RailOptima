@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Николайчик А.В. Все права защищены.
-// Дипломный проект 
-// «Разработка программы проектирования железнодорожных путей: модуль вызуализации», 
+// Дипломный проект
+// «Разработка программы проектирования железнодорожных путей: модуль вызуализации»,
 // ПривГУПС, 2026.
 
 #include "Services/ExcelExporter.h"
@@ -28,7 +28,7 @@ bool UExcelExporter::ExportReport(const FRailRouteReport& InReport, const FStrin
 
 	// Путь для libxlsxwriter — в UTF-8.
 	const FTCHARToUTF8 PathUtf8(*FullPath);
-	lxw_workbook* Workbook = workbook_new(PathUtf8.Get());
+	lxw_workbook*	   Workbook = workbook_new(PathUtf8.Get());
 
 	if (!Workbook)
 	{
@@ -128,7 +128,7 @@ void UExcelExporter::WriteSegmentsSheet(const FRailRouteReport& InReport, lxw_wo
 	for (int32 i = 0; i < InReport.Segments.Num(); ++i)
 	{
 		const FRailRouteSegment& Seg = InReport.Segments[i];
-		const uint32 Row = static_cast<uint32>(i + 1);
+		const uint32			 Row = static_cast<uint32>(i + 1);
 
 		worksheet_write_number(InSheet, Row, 0, i + 1, CellFormat);
 		worksheet_write_number(InSheet, Row, 1, Seg.FromNodeIndex, CellFormat);

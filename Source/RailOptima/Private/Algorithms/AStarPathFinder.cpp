@@ -9,8 +9,8 @@
 //  Статические константы
 // ─────────────────────────────────────────────────────────────────
 
-const int32 UAStarPathFinder::DirectionX[UAStarPathFinder::NumDirections] = { 0,  1,  0, -1,  1,  1, -1, -1 };
-const int32 UAStarPathFinder::DirectionY[UAStarPathFinder::NumDirections] = { -1,  0,  1,  0, -1,  1,  1, -1 };
+const int32 UAStarPathFinder::DirectionX[UAStarPathFinder::NumDirections] = { 0, 1, 0, -1, 1, 1, -1, -1 };
+const int32 UAStarPathFinder::DirectionY[UAStarPathFinder::NumDirections] = { -1, 0, 1, 0, -1, 1, 1, -1 };
 
 // ─────────────────────────────────────────────────────────────────
 //  Бинарный heap
@@ -33,7 +33,8 @@ namespace
 		while (InIndex > 0)
 		{
 			const int32 Parent = (InIndex - 1) / 2;
-			if (InFScores[InHeap[InIndex]] >= InFScores[InHeap[Parent]]) break;
+			if (InFScores[InHeap[InIndex]] >= InFScores[InHeap[Parent]])
+				break;
 			HeapSwap(InHeap, InPositions, InIndex, Parent);
 			InIndex = Parent;
 		}
@@ -46,11 +47,14 @@ namespace
 		{
 			const int32 Left = InIndex * 2 + 1;
 			const int32 Right = Left + 1;
-			int32 Smallest = InIndex;
+			int32		Smallest = InIndex;
 
-			if (Left < Count && InFScores[InHeap[Left]] < InFScores[InHeap[Smallest]]) Smallest = Left;
-			if (Right < Count && InFScores[InHeap[Right]] < InFScores[InHeap[Smallest]]) Smallest = Right;
-			if (Smallest == InIndex) break;
+			if (Left < Count && InFScores[InHeap[Left]] < InFScores[InHeap[Smallest]])
+				Smallest = Left;
+			if (Right < Count && InFScores[InHeap[Right]] < InFScores[InHeap[Smallest]])
+				Smallest = Right;
+			if (Smallest == InIndex)
+				break;
 
 			HeapSwap(InHeap, InPositions, InIndex, Smallest);
 			InIndex = Smallest;
@@ -87,11 +91,12 @@ namespace
 	void HeapUpdate(TArray<int32>& InHeap, TArray<int32>& InPositions, int32 InNode, const TArray<float>& InFScores)
 	{
 		const int32 Index = InPositions[InNode];
-		if (Index == INDEX_NONE) return;
+		if (Index == INDEX_NONE)
+			return;
 		HeapSiftUp(InHeap, InPositions, Index, InFScores);
 		HeapSiftDown(InHeap, InPositions, InPositions[InNode], InFScores);
 	}
-}
+} // namespace
 
 // ─────────────────────────────────────────────────────────────────
 //  Поиск пути
@@ -99,9 +104,9 @@ namespace
 
 FRailPathResult UAStarPathFinder::FindPath(
 	const FRailGridData& InGrid,
-	int32 InStartIndex,
-	int32 InEndIndex,
-	int32 InMaxExpansions)
+	int32				 InStartIndex,
+	int32				 InEndIndex,
+	int32				 InMaxExpansions)
 {
 	FRailPathResult Result;
 
@@ -153,7 +158,7 @@ FRailPathResult UAStarPathFinder::FindPath(
 	NodeState[InStartIndex] = 1;
 
 	TArray<int32, TInlineAllocator<8>> Neighbors;
-	int32 Expansions = 0;
+	int32							   Expansions = 0;
 
 	while (OpenHeap.Num() > 0)
 	{
@@ -180,7 +185,8 @@ FRailPathResult UAStarPathFinder::FindPath(
 
 		for (const int32 NeighborIndex : Neighbors)
 		{
-			if (NodeState[NeighborIndex] == 2) continue;
+			if (NodeState[NeighborIndex] == 2)
+				continue;
 
 			const float EdgeCost = EvaluateEdge(InGrid, CurrentIndex, NeighborIndex, CameFrom);
 			const float TentativeG = GScore[CurrentIndex] + EdgeCost;
@@ -219,8 +225,8 @@ void UAStarPathFinder::SetCostCalculator(UCostCalculator* InCalculator)
 // ─────────────────────────────────────────────────────────────────
 
 void UAStarPathFinder::CollectNeighbors(
-	const FRailGridData& InGrid,
-	int32 InNodeIndex,
+	const FRailGridData&				InGrid,
+	int32								InNodeIndex,
 	TArray<int32, TInlineAllocator<8>>& OutNeighbors) const
 {
 	const FRailGridNode& Node = InGrid.Nodes[InNodeIndex];
@@ -230,17 +236,20 @@ void UAStarPathFinder::CollectNeighbors(
 		const int32 NX = Node.X + DirectionX[i];
 		const int32 NY = Node.Y + DirectionY[i];
 
-		if (!InGrid.IsValid(NX, NY)) continue;
+		if (!InGrid.IsValid(NX, NY))
+			continue;
 
 		const int32 NeighborIndex = InGrid.IndexOf(NX, NY);
-		if (InGrid.Nodes[NeighborIndex].bIsForbidden) continue;
+		if (InGrid.Nodes[NeighborIndex].bIsForbidden)
+			continue;
 
 		if (DirectionX[i] != 0 && DirectionY[i] != 0)
 		{
 			const int32 SideA = InGrid.IndexOf(Node.X + DirectionX[i], Node.Y);
 			const int32 SideB = InGrid.IndexOf(Node.X, Node.Y + DirectionY[i]);
 
-			if (InGrid.Nodes[SideA].bIsForbidden || InGrid.Nodes[SideB].bIsForbidden) continue;
+			if (InGrid.Nodes[SideA].bIsForbidden || InGrid.Nodes[SideB].bIsForbidden)
+				continue;
 		}
 
 		OutNeighbors.Add(NeighborIndex);
@@ -250,15 +259,16 @@ void UAStarPathFinder::CollectNeighbors(
 void UAStarPathFinder::ReconstructPath(
 	const FRailGridData& InGrid,
 	const TArray<int32>& InCameFrom,
-	int32 InStartIndex,
-	int32 InEndIndex,
-	FRailPathResult& OutResult) const
+	int32				 InStartIndex,
+	int32				 InEndIndex,
+	FRailPathResult&	 OutResult) const
 {
 	int32 Current = InEndIndex;
 	while (Current != INDEX_NONE)
 	{
 		OutResult.NodeIndices.Add(Current);
-		if (Current == InStartIndex) break;
+		if (Current == InStartIndex)
+			break;
 		Current = InCameFrom[Current];
 	}
 	Algo::Reverse(OutResult.NodeIndices);
@@ -277,7 +287,7 @@ void UAStarPathFinder::ReconstructPath(
 
 		const int32 DX = FMath::Abs(CurrNode.X - PrevNode.X);
 		const int32 DY = FMath::Abs(CurrNode.Y - PrevNode.Y);
-		const bool bDiagonal = (DX != 0 && DY != 0);
+		const bool	bDiagonal = (DX != 0 && DY != 0);
 
 		const float EdgeLength_m = bDiagonal
 			? InGrid.StepSize_m * FMath::Sqrt(2.0f)
@@ -286,36 +296,36 @@ void UAStarPathFinder::ReconstructPath(
 		const float SlopeRatio = FMath::Abs(CurrNode.Height_m - PrevNode.Height_m) / EdgeLength_m;
 
 		const float TurnAngleDeg = (i >= 2)
-			? [&]() -> float
-			{
-				const FRailGridNode& BeforeNode = InGrid.Nodes[OutResult.NodeIndices[i - 2]];
-				const float PrevDirX = PrevNode.X - BeforeNode.X;
-				const float PrevDirY = PrevNode.Y - BeforeNode.Y;
-				const float CurrDirX = CurrNode.X - PrevNode.X;
-				const float CurrDirY = CurrNode.Y - PrevNode.Y;
+			? [&]() -> float {
+			const FRailGridNode& BeforeNode = InGrid.Nodes[OutResult.NodeIndices[i - 2]];
+			const float			 PrevDirX = PrevNode.X - BeforeNode.X;
+			const float			 PrevDirY = PrevNode.Y - BeforeNode.Y;
+			const float			 CurrDirX = CurrNode.X - PrevNode.X;
+			const float			 CurrDirY = CurrNode.Y - PrevNode.Y;
 
-				const float Dot = PrevDirX * CurrDirX + PrevDirY * CurrDirY;
-				const float LenA = FMath::Sqrt(PrevDirX * PrevDirX + PrevDirY * PrevDirY);
-				const float LenB = FMath::Sqrt(CurrDirX * CurrDirX + CurrDirY * CurrDirY);
-				if (LenA < KINDA_SMALL_NUMBER || LenB < KINDA_SMALL_NUMBER) return 0.0f;
+			const float Dot = PrevDirX * CurrDirX + PrevDirY * CurrDirY;
+			const float LenA = FMath::Sqrt(PrevDirX * PrevDirX + PrevDirY * PrevDirY);
+			const float LenB = FMath::Sqrt(CurrDirX * CurrDirX + CurrDirY * CurrDirY);
+			if (LenA < KINDA_SMALL_NUMBER || LenB < KINDA_SMALL_NUMBER)
+				return 0.0f;
 
-				const float CosAngle = FMath::Clamp(Dot / (LenA * LenB), -1.0f, 1.0f);
-				return FMath::RadiansToDegrees(FMath::Acos(CosAngle));
-			}()
-				: 0.0f;
+			const float CosAngle = FMath::Clamp(Dot / (LenA * LenB), -1.0f, 1.0f);
+			return FMath::RadiansToDegrees(FMath::Acos(CosAngle));
+		}()
+			: 0.0f;
 
-			const float GroundCoef = CostCalculator->GetGroundCoefficient(CurrNode.GroundType);
+		const float GroundCoef = CostCalculator->GetGroundCoefficient(CurrNode.GroundType);
 
-			// Уклон — в процентах, как требует формула ТЗ.
-			const float SlopePercent = SlopeRatio * 100.0f;
+		// Уклон — в процентах, как требует формула ТЗ.
+		const float SlopePercent = SlopeRatio * 100.0f;
 
-			const float EdgeCost = CostCalculator->CalculateEdgeCost(
-				EdgeLength_m, SlopePercent, TurnAngleDeg, GroundCoef);
+		const float EdgeCost = CostCalculator->CalculateEdgeCost(
+			EdgeLength_m, SlopePercent, TurnAngleDeg, GroundCoef);
 
-			OutResult.EdgeCosts.Add(EdgeCost);
-			OutResult.EdgeLengths.Add(EdgeLength_m);
-			OutResult.TotalLength_m += EdgeLength_m;
-			OutResult.TotalCost += EdgeCost;
+		OutResult.EdgeCosts.Add(EdgeCost);
+		OutResult.EdgeLengths.Add(EdgeLength_m);
+		OutResult.TotalLength_m += EdgeLength_m;
+		OutResult.TotalCost += EdgeCost;
 	}
 
 	// Диагностика — короткая сводка.
@@ -327,8 +337,8 @@ void UAStarPathFinder::ReconstructPath(
 
 float UAStarPathFinder::EvaluateEdge(
 	const FRailGridData& InGrid,
-	int32 InFromIndex,
-	int32 InToIndex,
+	int32				 InFromIndex,
+	int32				 InToIndex,
 	const TArray<int32>& InCameFrom) const
 {
 	const FRailGridNode& FromNode = InGrid.Nodes[InFromIndex];
@@ -336,7 +346,7 @@ float UAStarPathFinder::EvaluateEdge(
 
 	const int32 DX = FMath::Abs(ToNode.X - FromNode.X);
 	const int32 DY = FMath::Abs(ToNode.Y - FromNode.Y);
-	const bool bDiagonal = (DX != 0 && DY != 0);
+	const bool	bDiagonal = (DX != 0 && DY != 0);
 
 	const float EdgeLength_m = bDiagonal
 		? InGrid.StepSize_m * FMath::Sqrt(2.0f)
@@ -344,15 +354,15 @@ float UAStarPathFinder::EvaluateEdge(
 
 	const float SlopeRatio = FMath::Abs(ToNode.Height_m - FromNode.Height_m) / EdgeLength_m;
 
-	float TurnAngleDeg = 0.0f;
+	float		TurnAngleDeg = 0.0f;
 	const int32 PrevIndex = InCameFrom[InFromIndex];
 	if (PrevIndex != INDEX_NONE)
 	{
 		const FRailGridNode& PrevNode = InGrid.Nodes[PrevIndex];
-		const float PrevDirX = FromNode.X - PrevNode.X;
-		const float PrevDirY = FromNode.Y - PrevNode.Y;
-		const float CurrDirX = ToNode.X - FromNode.X;
-		const float CurrDirY = ToNode.Y - FromNode.Y;
+		const float			 PrevDirX = FromNode.X - PrevNode.X;
+		const float			 PrevDirY = FromNode.Y - PrevNode.Y;
+		const float			 CurrDirX = ToNode.X - FromNode.X;
+		const float			 CurrDirY = ToNode.Y - FromNode.Y;
 
 		const float Dot = PrevDirX * CurrDirX + PrevDirY * CurrDirY;
 		const float LenA = FMath::Sqrt(PrevDirX * PrevDirX + PrevDirY * PrevDirY);
@@ -374,8 +384,8 @@ float UAStarPathFinder::EvaluateEdge(
 
 float UAStarPathFinder::Heuristic(
 	const FRailGridData& InGrid,
-	int32 InFromIndex,
-	int32 InToIndex) const
+	int32				 InFromIndex,
+	int32				 InToIndex) const
 {
 	const FRailGridNode& From = InGrid.Nodes[InFromIndex];
 	const FRailGridNode& To = InGrid.Nodes[InToIndex];

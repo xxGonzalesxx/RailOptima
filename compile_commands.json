@@ -1,0 +1,92 @@
+[
+	{
+		"file": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/Module.RailOptima.gen.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/Module.RailOptima.gen.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/Module.RailOptima.gen.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/PerModuleInline.gen.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/PerModuleInline.gen.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/PerModuleInline.gen.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/Private/Algorithms/AStarPathFinder.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/AStarPathFinder.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/AStarPathFinder.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/Private/Algorithms/CostCalculator.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/CostCalculator.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/CostCalculator.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/Private/Core/HeightInterpolator.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/HeightInterpolator.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/HeightInterpolator.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/Private/Core/MapLoader.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/MapLoader.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/MapLoader.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/Private/Core/ProceduralTerrain.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/ProceduralTerrain.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/ProceduralTerrain.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/Private/Interactive/RailEndpoint.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/RailEndpoint.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/RailEndpoint.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/Private/Interactive/RailOptimaPlayerController.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/RailOptimaPlayerController.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/RailOptimaPlayerController.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/Private/Interactive/RailSpectatorPawn.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/RailSpectatorPawn.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/RailSpectatorPawn.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/Private/Services/ExcelExporter.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/ExcelExporter.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/ExcelExporter.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/Private/Visualization/PathRenderer.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/PathRenderer.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/PathRenderer.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/Private/Visualization/RoadRenderer.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/RoadRenderer.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/RoadRenderer.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/RailOptima.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/RailOptima.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/RailOptima.cpp.obj"
+	},
+	{
+		"file": "C:/Projects/UE/RailOptima/Source/RailOptima/RailOptimaGameMode/RailOptimaGameMode.cpp",
+		"command": "\"C:/Program Files/LLVM/bin/clang-cl.exe\" @\"C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/RailOptimaGameMode.cpp.obj.rsp\" ",
+		"directory": "C:/Program Files/Epic Games/UE_5.8/Engine/Source",
+		"output": "C:/Projects/UE/RailOptima/Intermediate/Build/Win64/x64/UnrealEditor/Development/RailOptima/RailOptimaGameMode.cpp.obj"
+	}
+]

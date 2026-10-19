@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Николайчик А.В. Все права защищены.
-// Дипломный проект 
-// «Разработка программы проектирования железнодорожных путей: модуль вызуализации», 
+// Дипломный проект
+// «Разработка программы проектирования железнодорожных путей: модуль вызуализации»,
 // ПривГУПС, 2026.
 
 #include "Algorithms/CostCalculator.h"
@@ -43,8 +43,7 @@ float UCostCalculator::GetGroundCoefficient(ERailGroundType InGroundType) const
 
 bool UCostCalculator::IsForbiddenGround(ERailGroundType InGroundType) const
 {
-	return InGroundType == ERailGroundType::City
-		|| InGroundType == ERailGroundType::Reserve;
+	return InGroundType == ERailGroundType::City || InGroundType == ERailGroundType::Reserve;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -87,15 +86,15 @@ const TArray<float>& UCostCalculator::GetDefaultCoefficients()
 	//  - скала и болото — самые дорогие;
 	//  - город и заповедник — фактически запретные зоны.
 	static const TArray<float> Defaults = {
-		1.0f,   // Loam
-		0.9f,   // Sand
-		3.5f,   // Rock
-		5.0f,   // Water
-		0.8f,   // Gravel
-		1.2f,   // Clay
-		1.8f,   // Forest
-		10.0f,  // City
-		10.0f   // Reserve
+		1.0f,  // Loam
+		0.9f,  // Sand
+		3.5f,  // Rock
+		5.0f,  // Water
+		0.8f,  // Gravel
+		1.2f,  // Clay
+		1.8f,  // Forest
+		10.0f, // City
+		10.0f  // Reserve
 	};
 	return Defaults;
 }

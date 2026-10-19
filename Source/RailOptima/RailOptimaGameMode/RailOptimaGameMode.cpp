@@ -7,14 +7,15 @@
 #include "Algorithms/AStarPathFinder.h"
 #include "Algorithms/CostCalculator.h"
 #include "Core/ProceduralTerrain.h"
-#include "Visualization/PathRenderer.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
 #include "Interactive/RailEndpoint.h"
 #include "Interactive/RailOptimaPlayerController.h"
 #include "Interactive/RailSpectatorPawn.h"
 #include "Kismet/GameplayStatics.h"
-#include "Engine/World.h"
 #include "TimerManager.h"
-#include "Engine/Engine.h"
+#include "Visualization/PathRenderer.h"
+
 
 // ─────────────────────────────────────────────────────────────────
 //  Жизненный цикл
@@ -125,8 +126,10 @@ void ARailOptimaGameMode::ApplyViewScaleFromCamera(ARailSpectatorPawn* InPawn)
 		CurrentViewScale,
 		(InPawn->GetCameraMode() == ERailCameraMode::FreeFly) ? TEXT("FreeFly") : TEXT("TopDown"));
 
-	if (StartEndpoint) StartEndpoint->SetViewScale(CurrentViewScale);
-	if (EndEndpoint)   EndEndpoint->SetViewScale(CurrentViewScale);
+	if (StartEndpoint)
+		StartEndpoint->SetViewScale(CurrentViewScale);
+	if (EndEndpoint)
+		EndEndpoint->SetViewScale(CurrentViewScale);
 
 	if (PathRenderer)
 	{
@@ -198,7 +201,8 @@ void ARailOptimaGameMode::SetupPathRenderer()
 		UE_LOG(LogTemp, Warning, TEXT("[RailGM] PathRenderer заспавнен программно."));
 	}
 
-	if (!PathRenderer) return;
+	if (!PathRenderer)
+		return;
 
 	PathRenderer->SetActorLocation(FVector::ZeroVector);
 	PathRenderer->SetActorRotation(FRotator::ZeroRotator);
@@ -219,9 +223,12 @@ void ARailOptimaGameMode::SetupEndpoints()
 	for (AActor* Actor : Found)
 	{
 		ARailEndpoint* E = Cast<ARailEndpoint>(Actor);
-		if (!E) continue;
-		if (E->bIsStart && !StartEndpoint) StartEndpoint = E;
-		else if (!E->bIsStart && !EndEndpoint) EndEndpoint = E;
+		if (!E)
+			continue;
+		if (E->bIsStart && !StartEndpoint)
+			StartEndpoint = E;
+		else if (!E->bIsStart && !EndEndpoint)
+			EndEndpoint = E;
 	}
 
 	FVector DefaultStartHit = FVector(0, 0, 0);
@@ -230,10 +237,10 @@ void ARailOptimaGameMode::SetupEndpoints()
 	if (Terrain)
 	{
 		const FRailHeightMapData& Map = Terrain->GetHeightMapData();
-		const float SideX_cm = Map.Width * static_cast<float>(Map.PixelSize_m) * 100.0f;
-		const float SideY_cm = Map.Height * static_cast<float>(Map.PixelSize_m) * 100.0f;
-		const FVector TLoc = Terrain->GetActorLocation();
-		const float M = AutoSpawnMargin_m * 100.0f;
+		const float				  SideX_cm = Map.Width * static_cast<float>(Map.PixelSize_m) * 100.0f;
+		const float				  SideY_cm = Map.Height * static_cast<float>(Map.PixelSize_m) * 100.0f;
+		const FVector			  TLoc = Terrain->GetActorLocation();
+		const float				  M = AutoSpawnMargin_m * 100.0f;
 		DefaultStartHit = FVector(TLoc.X + M, TLoc.Y + M, 0.0f);
 		DefaultEndHit = FVector(TLoc.X + SideX_cm - M, TLoc.Y + SideY_cm - M, 0.0f);
 	}
@@ -275,8 +282,10 @@ void ARailOptimaGameMode::SetupEndpoints()
 		UE_LOG(LogTemp, Log, TEXT("[RailGM] EndEndpoint с уровня: '%s'."), *EndEndpoint->GetName());
 	}
 
-	if (StartEndpoint) StartEndpoint->OnEndpointMoved.AddDynamic(this, &ARailOptimaGameMode::HandleEndpointMoved);
-	if (EndEndpoint)   EndEndpoint->OnEndpointMoved.AddDynamic(this, &ARailOptimaGameMode::HandleEndpointMoved);
+	if (StartEndpoint)
+		StartEndpoint->OnEndpointMoved.AddDynamic(this, &ARailOptimaGameMode::HandleEndpointMoved);
+	if (EndEndpoint)
+		EndEndpoint->OnEndpointMoved.AddDynamic(this, &ARailOptimaGameMode::HandleEndpointMoved);
 
 	UE_LOG(LogTemp, Log, TEXT("[RailGM] Маркеры готовы."));
 }
@@ -323,9 +332,9 @@ void ARailOptimaGameMode::RecomputePath()
 		return;
 	}
 
-	const double T0 = FPlatformTime::Seconds();
+	const double		  T0 = FPlatformTime::Seconds();
 	const FRailPathResult Result = PathFinder->FindPath(CachedGrid, StartIdx, EndIdx);
-	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
+	const double		  Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
 
 	if (!Result.bFound)
 	{
@@ -347,7 +356,7 @@ void ARailOptimaGameMode::RecomputePath()
 	}
 	else
 	{
-		const int32 NumNodes = Result.NodeIndices.Num();
+		const int32	  NumNodes = Result.NodeIndices.Num();
 		TArray<float> NodeUnitCosts;
 		NodeUnitCosts.Reserve(NumNodes);
 
@@ -370,7 +379,8 @@ void ARailOptimaGameMode::RecomputePath()
 			MaxU = FMath::Max(MaxU, Unit);
 		}
 
-		if (FMath::IsNearlyEqual(MinU, MaxU)) MaxU = MinU + 1.0f;
+		if (FMath::IsNearlyEqual(MinU, MaxU))
+			MaxU = MinU + 1.0f;
 
 		UE_LOG(LogTemp, Log,
 			TEXT("[RailGM] Раскраска по стоимости: unit-cost min=%.3f, max=%.3f."),
@@ -390,8 +400,9 @@ FRailGridData ARailOptimaGameMode::BuildGridFromTerrain(
 	const AProceduralTerrain& InTerrain, float InTargetStep_m) const
 {
 	const FRailHeightMapData& MapData = InTerrain.GetHeightMapData();
-	FRailGridData Grid;
-	if (MapData.Width <= 1 || MapData.Height <= 1 || MapData.Heights.Num() == 0) return Grid;
+	FRailGridData			  Grid;
+	if (MapData.Width <= 1 || MapData.Height <= 1 || MapData.Heights.Num() == 0)
+		return Grid;
 
 	// Работаем в системе координат ЛАНДШАФТА, а не PNG.
 	// Размер карты в метрах = MeshResolution × StepSize_m.
@@ -468,10 +479,7 @@ FRailGridData ARailOptimaGameMode::GenerateSyntheticGrid(int32 InSize, float InS
 			Node.Y = Y;
 			const float FX = static_cast<float>(X) / InSize;
 			const float FY = static_cast<float>(Y) / InSize;
-			Node.Height_m = 200.0f
-				+ FMath::Sin(FX * 4.0f * PI) * 80.0f
-				+ FMath::Cos(FY * 3.0f * PI) * 60.0f
-				+ Random.FRandRange(-5.0f, 5.0f);
+			Node.Height_m = 200.0f + FMath::Sin(FX * 4.0f * PI) * 80.0f + FMath::Cos(FY * 3.0f * PI) * 60.0f + Random.FRandRange(-5.0f, 5.0f);
 		}
 	}
 
@@ -486,10 +494,11 @@ FRailGridData ARailOptimaGameMode::GenerateSyntheticGrid(int32 InSize, float InS
 int32 ARailOptimaGameMode::WorldToNodeIndex(
 	const FRailGridData& InGrid, const FVector& InWorldPos) const
 {
-	if (!PathRenderer || InGrid.Width < 2 || InGrid.Height < 2) return INDEX_NONE;
+	if (!PathRenderer || InGrid.Width < 2 || InGrid.Height < 2)
+		return INDEX_NONE;
 
 	const FVector Origin = PathRenderer->GridWorldOrigin;
-	const float Step_cm = InGrid.StepSize_m * 100.0f;
+	const float	  Step_cm = InGrid.StepSize_m * 100.0f;
 
 	const int32 X = FMath::Clamp(
 		FMath::RoundToInt((InWorldPos.X - Origin.X) / Step_cm), 0, InGrid.Width - 1);
@@ -502,11 +511,12 @@ int32 ARailOptimaGameMode::WorldToNodeIndex(
 FVector ARailOptimaGameMode::NodeIndexToWorldXY(
 	const FRailGridData& InGrid, int32 InNodeIndex) const
 {
-	if (!InGrid.Nodes.IsValidIndex(InNodeIndex) || !PathRenderer) return FVector::ZeroVector;
+	if (!InGrid.Nodes.IsValidIndex(InNodeIndex) || !PathRenderer)
+		return FVector::ZeroVector;
 
 	const FRailGridNode& Node = InGrid.Nodes[InNodeIndex];
-	const FVector Origin = PathRenderer->GridWorldOrigin;
-	const float Step_cm = InGrid.StepSize_m * 100.0f;
+	const FVector		 Origin = PathRenderer->GridWorldOrigin;
+	const float			 Step_cm = InGrid.StepSize_m * 100.0f;
 
 	return FVector(Origin.X + Node.X * Step_cm, Origin.Y + Node.Y * Step_cm, 0.0f);
 }
@@ -517,7 +527,11 @@ FVector ARailOptimaGameMode::NodeIndexToWorldXY(
 
 void ARailOptimaGameMode::HandleEndpointMoved(ARailEndpoint* /*Endpoint*/)
 {
-	if (RecomputeDebounceSec <= 0.0f) { RecomputePath(); return; }
+	if (RecomputeDebounceSec <= 0.0f)
+	{
+		RecomputePath();
+		return;
+	}
 
 	GetWorldTimerManager().ClearTimer(RecomputeTimer);
 	GetWorldTimerManager().SetTimer(RecomputeTimer, this,
