@@ -1,6 +1,9 @@
+import org.springframework.boot.gradle.plugin.SpringBootPlugin
+
 plugins {
     java
     id("org.springframework.boot") version "4.1.1"
+    id("io.freefair.lombok") version "9.8.0"
 }
 
 group = "com.railoptima"
@@ -12,69 +15,59 @@ java {
     }
 }
 
-configurations {
-    compileOnly {
-        extendsFrom(configurations.annotationProcessor.get())
-    }
-}
-
 repositories {
     mavenCentral()
 }
 
 val jjwtVersion = "0.13.0"
-val lombokVersion = "1.18.48"
 val springdocVersion = "3.1.1"
 
 dependencies {
-    // Встроенный нативный BOM управления зависимостями Spring Boot 4.x
-    implementation(platform("org.springframework.boot:spring-boot-dependencies:4.1.1"))
-
-    // Встроенный нативный BOM управления зависимостями Spring AI 2.x
+    // Используем встроенные координаты плагина Spring Boot. Чисто, без хардкода версий BOM
+    implementation(platform(SpringBootPlugin.BOM_COORDINATES))
     implementation(platform("org.springframework.ai:spring-ai-bom:2.0.1"))
 
-    // Web & Validation
+    // Core Starters (Версии управляются через Spring BOM автоматически)
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-
-    // Security
     implementation("org.springframework.boot:spring-boot-starter-security")
 
-    // JWT (JJWT)
+    // Security & JWT
     implementation("io.jsonwebtoken:jjwt-api:$jjwtVersion")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:$jjwtVersion")
     runtimeOnly("io.jsonwebtoken:jjwt-jackson:$jjwtVersion")
 
-    // OpenAPI / Swagger
+    // API OpenDocs
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:$springdocVersion")
 
-    // Database & Migrations
+    // Persistence layer
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     runtimeOnly("org.postgresql:postgresql")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.flywaydb:flyway-database-postgresql")
 
-    // Lombok (Добавлен также в тест-контекст, чтобы у Gradle 9.x не было ворнингов при сборке тестов)
-    compileOnly("org.projectlombok:lombok:$lombokVersion")
-    annotationProcessor("org.projectlombok:lombok:$lombokVersion")
-    testCompileOnly("org.projectlombok:lombok:$lombokVersion")
-    testAnnotationProcessor("org.projectlombok:lombok:$lombokVersion")
-
-    // Test
+    // Testing scope
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 sourceSets {
     main {
-        java.srcDirs("Backend/src/main/java")
-        resources.srcDirs("Backend/src/main/resources")
+        java.srcDirs(rootProject.file("Backend/src/main/java"))
+        resources.srcDirs(rootProject.file("Backend/src/main/resources"))
     }
     test {
-        java.srcDirs("Backend/src/test/java")
-        resources.srcDirs("Backend/src/test/resources")
+        java.srcDirs(rootProject.file("Backend/src/test/java"))
+        resources.srcDirs(rootProject.file("Backend/src/test/resources"))
     }
+}
+
+tasks.withType<JavaCompile> {
+    options.encoding = "UTF-8"
+    options.compilerArgs.addAll(listOf(
+        "-Xlint:deprecation",
+    ))
 }
 
 tasks.withType<Test> {
@@ -84,11 +77,13 @@ tasks.withType<Test> {
 tasks.withType<org.springframework.boot.gradle.tasks.run.BootRun> {
     val envFile = rootProject.file(".env")
     if (envFile.exists()) {
-        envFile.readLines().forEach { line ->
-            if (line.isNotBlank() && !line.startsWith("#") && line.contains("=")) {
-                val (key, value) = line.split("=", limit = 2)
-                environment(key.trim(), value.trim())
-            }
+        envFile.useLines { lines ->
+            lines.map { it.trim() }
+                .filter { it.isNotEmpty() && !it.startsWith("#") && it.contains("=") }
+                .forEach { line ->
+                    val (key, value) = line.split("=", limit = 2)
+                    environment(key.trim(), value.trim())
+                }
         }
     }
 }

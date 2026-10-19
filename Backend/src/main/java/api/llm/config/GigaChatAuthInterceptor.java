@@ -1,11 +1,11 @@
 package api.llm.config;
 
+import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpRequestExecution;
 import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.lang.NonNull;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
@@ -33,7 +33,7 @@ public class GigaChatAuthInterceptor implements ClientHttpRequestInterceptor {
 
     @Override
     @NonNull
-    public ClientHttpResponse intercept(@NonNull HttpRequest request, @NonNull byte[] body,
+    public ClientHttpResponse intercept(@NonNull HttpRequest request, byte @NonNull [] body,
                                         @NonNull ClientHttpRequestExecution execution) throws IOException {
         if (cachedAccessToken == null || System.currentTimeMillis() >= tokenExpiryTime) {
             refreshAccessToken();
@@ -66,10 +66,9 @@ public class GigaChatAuthInterceptor implements ClientHttpRequestInterceptor {
 
             this.cachedAccessToken = (String) response.get("access_token");
 
-            // expires_at приходит как unix-время в мс; если вдруг отсутствует — fallback на 25 минут
             Object expiresAt = response.get("expires_at");
             this.tokenExpiryTime = (expiresAt instanceof Number n)
-                    ? n.longValue() - 60_000 // обновляем на минуту раньше реального истечения
+                    ? n.longValue() - 60_000
                     : System.currentTimeMillis() + (25 * 60 * 1000);
 
         } catch (Exception e) {
