@@ -6,6 +6,7 @@
 #pragma once
 
 #include "Algorithms/CostCalculator.h"
+#include "Algorithms/RailCategories.h"
 #include "CoreMinimal.h"
 #include "UObject/NoExportTypes.h"
 #include "AStarPathFinder.generated.h"
@@ -56,12 +57,6 @@ struct FRailGridData
 	}
 };
 
-/**
- * Результат поиска пути A*.
- *
- * Помимо узлов и итогов, хранит по каждому ребру его стоимость
- * и длину — это нужно для раскраски и отчёта.
- */
 USTRUCT(BlueprintType)
 struct FRailPathResult
 {
@@ -70,16 +65,12 @@ struct FRailPathResult
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Path")
 	bool bFound = false;
 
-	// Последовательность индексов узлов от старта до финиша.
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Path")
 	TArray<int32> NodeIndices;
 
-	// Стоимость каждого ребра, длина = NodeIndices.Num() - 1.
-	// Ребро i соединяет узлы NodeIndices[i] и NodeIndices[i+1].
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Path")
 	TArray<float> EdgeCosts;
 
-	// Длина каждого ребра в метрах, та же длина массива.
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Path")
 	TArray<float> EdgeLengths;
 
@@ -112,6 +103,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "RailOptima|Path")
 	UCostCalculator* GetCostCalculator() const { return CostCalculator; }
 
+	// Установить нормативы категории ЖД (макс. уклон, радиусы).
+	void SetCategoryNorms(const FRailCategoryNorms& InNorms) { CurrentNorms = InNorms; }
+
 private:
 	void CollectNeighbors(
 		const FRailGridData&				InGrid,
@@ -135,6 +129,8 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UCostCalculator> CostCalculator;
+
+	FRailCategoryNorms CurrentNorms;
 
 	static constexpr int32 NumDirections = 8;
 	static const int32	   DirectionX[NumDirections];

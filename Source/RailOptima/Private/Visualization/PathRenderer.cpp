@@ -1,17 +1,10 @@
 // Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Дипломный проект
-// «Разработка программы проектирования железнодорожных путей: модуль визуализации»,
-// ПривГУПС, 2026.
 
 #include "Visualization/PathRenderer.h"
 #include "Components/BillboardComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "ProceduralMeshComponent.h"
-
-
-// ─────────────────────────────────────────────────────────────────
-//  Жизненный цикл
-// ─────────────────────────────────────────────────────────────────
 
 APathRenderer::APathRenderer()
 {
@@ -23,14 +16,12 @@ APathRenderer::APathRenderer()
 	Billboard = CreateDefaultSubobject<UBillboardComponent>(TEXT("Billboard"));
 	Billboard->SetupAttachment(SceneRoot);
 #if WITH_EDITOR
-	// bVisualizeComponent — editor-only. В Shipping его нет.
 	Billboard->bVisualizeComponent = true;
 #endif
 	Billboard->SetHiddenInGame(true);
 
 	PathMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("PathMesh"));
 	PathMesh->SetupAttachment(SceneRoot);
-
 	PathMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	PathMesh->SetCastShadow(false);
 	PathMesh->bUseAsyncCooking = true;
@@ -39,24 +30,11 @@ APathRenderer::APathRenderer()
 void APathRenderer::BeginPlay()
 {
 	Super::BeginPlay();
-
 	if (PathMesh)
-	{
 		PathMesh->ClearAllMeshSections();
-	}
-
 	BaseWidth_cm = Width_cm;
 	BaseHeight_cm = Height_cm;
-
-	UE_LOG(LogTemp, Log,
-		TEXT("[PathRenderer] BeginPlay: Width=%.0f, Height=%.0f, ZOffset=%.0f, Smooth=%s, Samples=%d."),
-		BaseWidth_cm, BaseHeight_cm, ZOffset_cm,
-		bSmoothPath ? TEXT("true") : TEXT("false"), SamplesPerSegment);
 }
-
-// ─────────────────────────────────────────────────────────────────
-//  Публичный API
-// ─────────────────────────────────────────────────────────────────
 
 void APathRenderer::RenderPath(const FRailGridData& InGrid, const FRailPathResult& InPath)
 {
@@ -68,7 +46,6 @@ void APathRenderer::RenderPath(const FRailGridData& InGrid, const FRailPathResul
 
 	TArray<float> Heights;
 	Heights.Reserve(InPath.NodeIndices.Num());
-
 	float MinH = TNumericLimits<float>::Max();
 	float MaxH = TNumericLimits<float>::Lowest();
 
@@ -84,33 +61,20 @@ void APathRenderer::RenderPath(const FRailGridData& InGrid, const FRailPathResul
 
 	if (FMath::IsNearlyEqual(MinH, MaxH))
 		MaxH = MinH + 1.0f;
-
 	RenderColoredPath(InGrid, InPath, Heights, MinH, MaxH);
 }
 
-void APathRenderer::RenderColoredPath(
-	const FRailGridData&   InGrid,
-	const FRailPathResult& InPath,
-	const TArray<float>&   InNodeValues,
-	float				   InLowValue,
-	float				   InHighValue)
+void APathRenderer::RenderColoredPath(const FRailGridData& InGrid, const FRailPathResult& InPath, const TArray<float>& InNodeValues, float InLowValue, float InHighValue)
 {
 	if (!InPath.bFound || InPath.NodeIndices.Num() < 2)
 	{
 		ClearPath();
 		return;
 	}
-
 	if (InNodeValues.Num() != InPath.NodeIndices.Num())
-	{
-		UE_LOG(LogTemp, Error,
-			TEXT("[PathRenderer] Длина InNodeValues (%d) != числа узлов пути (%d)."),
-			InNodeValues.Num(), InPath.NodeIndices.Num());
 		return;
-	}
 
-	const float Range = FMath::Max(InHighValue - InLowValue, KINDA_SMALL_NUMBER);
-
+	const float			 Range = FMath::Max(InHighValue - InLowValue, KINDA_SMALL_NUMBER);
 	TArray<FVector>		 RawPoints;
 	TArray<FLinearColor> RawColors;
 	RawPoints.Reserve(InPath.NodeIndices.Num());
@@ -121,10 +85,8 @@ void APathRenderer::RenderColoredPath(
 		const int32 NodeIndex = InPath.NodeIndices[i];
 		if (!InGrid.Nodes.IsValidIndex(NodeIndex))
 			continue;
-
 		const FRailGridNode& Node = InGrid.Nodes[NodeIndex];
 		RawPoints.Add(GridNodeToWorld(Node, InGrid.StepSize_m));
-
 		const float T = FMath::Clamp((InNodeValues[i] - InLowValue) / Range, 0.0f, 1.0f);
 		RawColors.Add(EvaluateColor(T));
 	}
@@ -140,39 +102,33 @@ void APathRenderer::RenderColoredPath(
 
 	if (bSmoothPath && SamplesPerSegment > 1)
 	{
-		SmoothPolylineCatmullRom(
-			RawPoints, RawColors, SamplesPerSegment,
-			FinalPoints, FinalColors);
-
-		UE_LOG(LogTemp, Log,
-			TEXT("[PathRenderer] Сглаживание: %d → %d точек (Catmull-Rom, samples=%d)."),
-			RawPoints.Num(), FinalPoints.Num(), SamplesPerSegment);
+		SmoothPolylineCatmullRom(RawPoints, RawColors, SamplesPerSegment, FinalPoints, FinalColors);
 	}
 	else
 	{
 		FinalPoints = RawPoints;
 		FinalColors = RawColors;
-		UE_LOG(LogTemp, Log, TEXT("[PathRenderer] Сглаживание отключено."));
-	}
-
-	if (bLogLayout)
-	{
-		UE_LOG(LogTemp, Log,
-			TEXT("[PathRenderer] Геометрия: точек=%d, Width=%.0f, Height=%.0f, ZOffset=%.0f, ViewScale=%.2f."),
-			FinalPoints.Num(), Width_cm, Height_cm, ZOffset_cm, ViewScale);
 	}
 
 	BuildRibbon(FinalPoints, FinalColors, Width_cm, Height_cm);
 
 	if (PathMaterial)
-	{
 		PathMesh->SetMaterial(0, PathMaterial);
-	}
-	else
+}
+
+// НОВЫЙ МЕТОД: Рендер готовых точек (из генератора дуг)
+void APathRenderer::RenderCustomPath(const TArray<FVector>& InPoints, const TArray<FLinearColor>& InColors)
+{
+	if (InPoints.Num() < 2 || InPoints.Num() != InColors.Num())
 	{
-		UE_LOG(LogTemp, Error,
-			TEXT("[PathRenderer] PathMaterial НЕ ЗАДАН."));
+		ClearPath();
+		return;
 	}
+
+	BuildRibbon(InPoints, InColors, Width_cm, Height_cm);
+
+	if (PathMaterial)
+		PathMesh->SetMaterial(0, PathMaterial);
 }
 
 void APathRenderer::ClearPath()
@@ -184,31 +140,18 @@ void APathRenderer::ClearPath()
 void APathRenderer::SetViewScale(float InScale)
 {
 	const float NewScale = FMath::Clamp(InScale, MinViewScale, MaxViewScale);
-
 	if (FMath::IsNearlyEqual(NewScale, ViewScale, 0.01f))
-	{
 		return;
-	}
 
 	ViewScale = NewScale;
 	Width_cm = BaseWidth_cm * ViewScale;
 	Height_cm = BaseHeight_cm * ViewScale;
-
-	UE_LOG(LogTemp, Log,
-		TEXT("[PathRenderer] SetViewScale: %.2f → Width=%.0f, Height=%.0f."),
-		ViewScale, Width_cm, Height_cm);
 }
-
-// ─────────────────────────────────────────────────────────────────
-//  Внутреннее
-// ─────────────────────────────────────────────────────────────────
 
 FLinearColor APathRenderer::EvaluateColor(float InT) const
 {
 	if (InT < 0.5f)
-	{
 		return FMath::Lerp(CheapColor, MidColor, InT * 2.0f);
-	}
 	return FMath::Lerp(MidColor, ExpensiveColor, (InT - 0.5f) * 2.0f);
 }
 
@@ -217,12 +160,7 @@ FVector APathRenderer::GridNodeToWorld(const FRailGridNode& InNode, float InStep
 	return GridWorldOrigin + FVector(static_cast<float>(InNode.X) * InStepSize_m * 100.0f, static_cast<float>(InNode.Y) * InStepSize_m * 100.0f, InNode.Height_m * 100.0f * WorldZScale + ZOffset_cm);
 }
 
-void APathRenderer::SmoothPolylineCatmullRom(
-	const TArray<FVector>&		InPoints,
-	const TArray<FLinearColor>& InColors,
-	int32						InSamplesPerSegment,
-	TArray<FVector>&			OutPoints,
-	TArray<FLinearColor>&		OutColors)
+void APathRenderer::SmoothPolylineCatmullRom(const TArray<FVector>& InPoints, const TArray<FLinearColor>& InColors, int32 InSamplesPerSegment, TArray<FVector>& OutPoints, TArray<FLinearColor>& OutColors)
 {
 	const int32 N = InPoints.Num();
 	if (N < 2 || InSamplesPerSegment < 1)
@@ -237,51 +175,37 @@ void APathRenderer::SmoothPolylineCatmullRom(
 	OutPoints.Reserve((N - 1) * InSamplesPerSegment + 1);
 	OutColors.Reserve((N - 1) * InSamplesPerSegment + 1);
 
-	auto GetPoint = [&](int32 Index) -> FVector {
-		return InPoints[FMath::Clamp(Index, 0, N - 1)];
-	};
-	auto GetColor = [&](int32 Index) -> FLinearColor {
-		return InColors[FMath::Clamp(Index, 0, N - 1)];
-	};
+	auto GetPoint = [&](int32 Index) -> FVector { return InPoints[FMath::Clamp(Index, 0, N - 1)]; };
+	auto GetColor = [&](int32 Index) -> FLinearColor { return InColors[FMath::Clamp(Index, 0, N - 1)]; };
 
 	for (int32 i = 0; i < N - 1; ++i)
 	{
-		const FVector P0 = GetPoint(i - 1);
-		const FVector P1 = GetPoint(i);
-		const FVector P2 = GetPoint(i + 1);
-		const FVector P3 = GetPoint(i + 2);
-
+		const FVector	   P0 = GetPoint(i - 1);
+		const FVector	   P1 = GetPoint(i);
+		const FVector	   P2 = GetPoint(i + 1);
+		const FVector	   P3 = GetPoint(i + 2);
 		const FLinearColor C1 = GetColor(i);
 		const FLinearColor C2 = GetColor(i + 1);
 
 		for (int32 s = 0; s < InSamplesPerSegment; ++s)
 		{
-			const float t = static_cast<float>(s) / static_cast<float>(InSamplesPerSegment);
-			const float t2 = t * t;
-			const float t3 = t2 * t;
-
-			const FVector P =
-				0.5f * ((2.0f * P1) + (-P0 + P2) * t + (2.0f * P0 - 5.0f * P1 + 4.0f * P2 - P3) * t2 + (-P0 + 3.0f * P1 - 3.0f * P2 + P3) * t3);
-
+			const float	  t = static_cast<float>(s) / static_cast<float>(InSamplesPerSegment);
+			const float	  t2 = t * t;
+			const float	  t3 = t2 * t;
+			const FVector P = 0.5f * ((2.0f * P1) + (-P0 + P2) * t + (2.0f * P0 - 5.0f * P1 + 4.0f * P2 - P3) * t2 + (-P0 + 3.0f * P1 - 3.0f * P2 + P3) * t3);
 			OutPoints.Add(P);
 			OutColors.Add(FMath::Lerp(C1, C2, t));
 		}
 	}
-
 	OutPoints.Add(InPoints.Last());
 	OutColors.Add(InColors.Last());
 }
 
-void APathRenderer::BuildRibbon(
-	const TArray<FVector>&		InPoints,
-	const TArray<FLinearColor>& InColors,
-	float						InWidth_cm,
-	float						InHeight_cm)
+void APathRenderer::BuildRibbon(const TArray<FVector>& InPoints, const TArray<FLinearColor>& InColors, float InWidth_cm, float InHeight_cm)
 {
 	const int32 NumPoints = InPoints.Num();
 	if (NumPoints < 2)
 		return;
-
 	const float HalfWidth = InWidth_cm * 0.5f;
 
 	TArray<FVector2D> Directions;
@@ -325,12 +249,10 @@ void APathRenderer::BuildRibbon(
 		const FVector2D	 Perp(-Dir.Y, Dir.X);
 		const FVector	 Lateral(Perp.X * HalfWidth, Perp.Y * HalfWidth, 0.0f);
 
-		const FVector L = P - Lateral;
-		const FVector R = P + Lateral;
-
-		const FVector LTop(L.X, L.Y, L.Z + InHeight_cm);
-		const FVector RTop(R.X, R.Y, R.Z + InHeight_cm);
-
+		const FVector		   L = P - Lateral;
+		const FVector		   R = P + Lateral;
+		const FVector		   LTop(L.X, L.Y, L.Z + InHeight_cm);
+		const FVector		   RTop(R.X, R.Y, R.Z + InHeight_cm);
 		const FProcMeshTangent Tangent(FVector(Dir.X, Dir.Y, 0.0f), false);
 
 		Vertices.Add(LTop);
@@ -338,19 +260,16 @@ void APathRenderer::BuildRibbon(
 		Normals.Add(FVector::UpVector);
 		UVs.Add(FVector2D(0.0f, static_cast<float>(i)));
 		Tangents.Add(Tangent);
-
 		Vertices.Add(RTop);
 		VertColors.Add(InColors[i]);
 		Normals.Add(FVector::UpVector);
 		UVs.Add(FVector2D(1.0f, static_cast<float>(i)));
 		Tangents.Add(Tangent);
-
 		Vertices.Add(L);
 		VertColors.Add(InColors[i]);
 		Normals.Add(FVector(-Perp.X, -Perp.Y, 0.0f));
 		UVs.Add(FVector2D(0.0f, static_cast<float>(i)));
 		Tangents.Add(Tangent);
-
 		Vertices.Add(R);
 		VertColors.Add(InColors[i]);
 		Normals.Add(FVector(Perp.X, Perp.Y, 0.0f));
@@ -367,7 +286,6 @@ void APathRenderer::BuildRibbon(
 		const int32 RTop0 = i * 4 + 1;
 		const int32 LBot0 = i * 4 + 2;
 		const int32 RBot0 = i * 4 + 3;
-
 		const int32 LTop1 = (i + 1) * 4 + 0;
 		const int32 RTop1 = (i + 1) * 4 + 1;
 		const int32 LBot1 = (i + 1) * 4 + 2;
@@ -379,14 +297,12 @@ void APathRenderer::BuildRibbon(
 		Triangles.Add(RTop0);
 		Triangles.Add(RTop1);
 		Triangles.Add(LTop1);
-
 		Triangles.Add(LTop0);
 		Triangles.Add(LBot0);
 		Triangles.Add(LTop1);
 		Triangles.Add(LBot0);
 		Triangles.Add(LBot1);
 		Triangles.Add(LTop1);
-
 		Triangles.Add(RTop0);
 		Triangles.Add(RTop1);
 		Triangles.Add(RBot0);
@@ -396,32 +312,7 @@ void APathRenderer::BuildRibbon(
 	}
 
 	PathMesh->ClearAllMeshSections();
-	PathMesh->CreateMeshSection_LinearColor(
-		0,
-		Vertices,
-		Triangles,
-		Normals,
-		UVs,
-		VertColors,
-		Tangents,
-		/*bCreateCollision=*/false,
-		/*bSRGBConversion=*/true);
-
+	PathMesh->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, VertColors, Tangents, false, true);
 	if (PathMaterial)
-	{
 		PathMesh->SetMaterial(0, PathMaterial);
-	}
-
-	if (bLogVertexColors && VertColors.Num() > 0)
-	{
-		const FLinearColor& First = VertColors[0];
-		const FLinearColor& Last = VertColors[VertColors.Num() - 1];
-
-		UE_LOG(LogTemp, Log,
-			TEXT("[PathRenderer] Лента: %d точек, %d вершин, %d треугольников. ")
-				TEXT("Первый (R=%.2f G=%.2f B=%.2f), последний (R=%.2f G=%.2f B=%.2f)."),
-			NumPoints, Vertices.Num(), Triangles.Num() / 3,
-			First.R, First.G, First.B,
-			Last.R, Last.G, Last.B);
-	}
 }

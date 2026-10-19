@@ -1,7 +1,5 @@
 // Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Дипломный проект
-// «Разработка программы проектирования железнодорожных путей: модуль визуализации»,
-// ПривГУПС, 2026.
 
 #pragma once
 
@@ -9,7 +7,6 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "PathRenderer.generated.h"
-
 
 class UProceduralMeshComponent;
 class UMaterialInterface;
@@ -22,15 +19,6 @@ enum class ERailPathColorMode : uint8
 	Cost   UMETA(DisplayName = "По стоимости")
 };
 
-/**
- * Отрисовка найденного маршрута объёмной цветной лентой над ландшафтом.
- *
- * Геометрия: верхняя поверхность + две боковые стенки.
- *
- * Сглаживание: если bSmoothPath = true, ломаная A* пересчитывается
- * сплайном Catmull-Rom с SamplesPerSegment промежуточных точек на сегмент.
- * Сплайн проходит через все исходные узлы — конечные точки маршрута не смещаются.
- */
 UCLASS(Blueprintable)
 class RAILOPTIMA_API APathRenderer : public AActor
 {
@@ -51,6 +39,10 @@ public:
 		const TArray<float>&   InNodeValues,
 		float				   InLowValue,
 		float				   InHighValue);
+
+	// НОВЫЙ МЕТОД: Рендер произвольного массива точек (для генератора дуг)
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Path")
+	void RenderCustomPath(const TArray<FVector>& InPoints, const TArray<FLinearColor>& InColors);
 
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Path")
 	void ClearPath();
@@ -85,19 +77,14 @@ public:
 	FVector GridWorldOrigin = FVector::ZeroVector;
 
 	// ─────────────────────────────────────────────────────────────────
-	//  Сглаживание (Catmull-Rom)
+	//  Сглаживание (для A* сетки)
 	// ─────────────────────────────────────────────────────────────────
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Smoothing")
 	bool bSmoothPath = true;
 
-	// Количество промежуточных точек на каждый сегмент ломаной.
-	// 1 — без сглаживания (только исходные узлы).
-	// 4 — по умолчанию, плавно.
-	// 8 — очень гладко, больше вершин (16 на сегмент вместо 8).
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Smoothing",
-		meta = (ClampMin = "1", ClampMax = "16",
-			EditCondition = "bSmoothPath"))
+		meta = (ClampMin = "1", ClampMax = "16", EditCondition = "bSmoothPath"))
 	int32 SamplesPerSegment = 4;
 
 	// ─────────────────────────────────────────────────────────────────
@@ -116,10 +103,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Appearance|Color")
 	FLinearColor ExpensiveColor = FLinearColor(0.9f, 0.05f, 0.05f, 1.0f);
 
-	// ─────────────────────────────────────────────────────────────────
-	//  Отладка
-	// ─────────────────────────────────────────────────────────────────
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Debug")
 	bool bLogVertexColors = true;
 
@@ -127,16 +110,13 @@ public:
 	bool bLogLayout = true;
 
 private:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RailOptima|Path",
-		meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RailOptima|Path", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USceneComponent> SceneRoot;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RailOptima|Path",
-		meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RailOptima|Path", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UBillboardComponent> Billboard;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RailOptima|Path",
-		meta = (AllowPrivateAccess = "true"))
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "RailOptima|Path", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UProceduralMeshComponent> PathMesh;
 
 	float BaseWidth_cm = 0.0f;
@@ -150,9 +130,6 @@ private:
 
 	FVector GridNodeToWorld(const FRailGridNode& InNode, float InStepSize_m) const;
 
-	// Пересэмплирование ломаной сплайном Catmull-Rom.
-	// Проходит через все исходные точки, между ними вставляет
-	// SamplesPerSegment промежуточных. Цвета интерполируются линейно.
 	static void SmoothPolylineCatmullRom(
 		const TArray<FVector>&		InPoints,
 		const TArray<FLinearColor>& InColors,

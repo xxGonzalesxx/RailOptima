@@ -168,7 +168,7 @@ bool AProceduralTerrain::SampleTerrainZ_cm(const FVector2D& InWorldXY,
 	// Расширяем допуск до Res - 1 + 0.5f, чтобы точки на границе меша не давали
 	// miss.
 	const float MaxIdx = static_cast<float>(Res - 1);
-	if (FX < 0.0f || FY < 0.0f || FX > MaxIdx + 0.5f || FY > MaxIdx + 0.5f)
+	if (FX < -0.5f || FY < -0.5f || FX > MaxIdx + 0.5f || FY > MaxIdx + 0.5f)
 		return false;
 
 	const int32 X0 = FMath::Clamp(FMath::FloorToInt(FX), 0, Res - 1);

@@ -230,6 +230,7 @@ void UAStarPathFinder::CollectNeighbors(
 	TArray<int32, TInlineAllocator<8>>& OutNeighbors) const
 {
 	const FRailGridNode& Node = InGrid.Nodes[InNodeIndex];
+	const float			 MaxSlopePermille = CurrentNorms.MaxSlopePermille;
 
 	for (int32 i = 0; i < NumDirections; ++i)
 	{
@@ -250,6 +251,21 @@ void UAStarPathFinder::CollectNeighbors(
 
 			if (InGrid.Nodes[SideA].bIsForbidden || InGrid.Nodes[SideB].bIsForbidden)
 				continue;
+		}
+
+		// ── Проверка уклона по нормативам категории ─────────────
+		const bool	bDiagonal = (DirectionX[i] != 0 && DirectionY[i] != 0);
+		const float EdgeLength_m = bDiagonal
+			? InGrid.StepSize_m * 1.41421356f
+			: InGrid.StepSize_m;
+
+		const FRailGridNode& NeighborNode = InGrid.Nodes[NeighborIndex];
+		const float			 HeightDiff_m = FMath::Abs(NeighborNode.Height_m - Node.Height_m);
+		const float			 SlopePermille = (HeightDiff_m / EdgeLength_m) * 1000.0f;
+
+		if (SlopePermille > MaxSlopePermille)
+		{
+			continue; // Уклон превышает норматив — ребро запрещено.
 		}
 
 		OutNeighbors.Add(NeighborIndex);
@@ -315,8 +331,6 @@ void UAStarPathFinder::ReconstructPath(
 			: 0.0f;
 
 		const float GroundCoef = CostCalculator->GetGroundCoefficient(CurrNode.GroundType);
-
-		// Уклон — в процентах, как требует формула ТЗ.
 		const float SlopePercent = SlopeRatio * 100.0f;
 
 		const float EdgeCost = CostCalculator->CalculateEdgeCost(
@@ -328,7 +342,6 @@ void UAStarPathFinder::ReconstructPath(
 		OutResult.TotalCost += EdgeCost;
 	}
 
-	// Диагностика — короткая сводка.
 	UE_LOG(LogTemp, Verbose,
 		TEXT("[AStar] Reconstruct: узлов=%d, рёбер=%d, длина=%.1f м, стоимость=%.1f ед."),
 		OutResult.NodeIndices.Num(), OutResult.EdgeCosts.Num(),
