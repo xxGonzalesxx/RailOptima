@@ -95,7 +95,7 @@ public:
 		const FRailGridData& InGrid,
 		int32				 InStartIndex,
 		int32				 InEndIndex,
-		int32				 InMaxExpansions = 500000);
+		int32				 InMaxExpansions = 2000000);
 
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Path")
 	void SetCostCalculator(UCostCalculator* InCalculator);

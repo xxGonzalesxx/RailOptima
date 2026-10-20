@@ -1,10 +1,13 @@
 // Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Дипломный проект
+// «Разработка программы проектирования железнодорожных путей: модуль визуализации»,
+// ПривГУПС, 2026.
 
 #pragma once
 
 #include "Algorithms/AStarPathFinder.h"
 #include "Algorithms/RailCategories.h"
+#include "Algorithms/RailPathValidator.h"
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
 #include "RailOptimaGameMode.generated.h"
@@ -14,21 +17,26 @@ class AProceduralTerrain;
 class ARailEndpoint;
 class ARailOptimaPlayerController;
 class ARailSpectatorPawn;
+class URailCostSummaryWidget;
 
-DECLARE_MULTICAST_DELEGATE_FourParams(FRailPathRecomputedSignature, double, double, double, int32);
+DECLARE_MULTICAST_DELEGATE_FourParams(FRailPathRecomputedSignature,
+	double /*Length_m*/, double /*Cost_kRub*/, double /*TimeMs*/, int32 /*Nodes*/);
 
 USTRUCT(BlueprintType)
 struct FRailRuntimeSettings
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Settings")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Settings",
+		meta = (ClampMin = "0.0", ClampMax = "100.0"))
 	float SlopePenalty = 0.1f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Settings")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Settings",
+		meta = (ClampMin = "0.0", ClampMax = "100.0"))
 	float TurnPenalty = 0.5f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Settings")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Settings",
+		meta = (ClampMin = "10.0", ClampMax = "1000.0"))
 	float TargetStepSize_m = 90.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Settings")
@@ -51,9 +59,22 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Settings")
 	void ApplySettings(float InSlopePenalty, float InTurnPenalty, float InStepSize_m, bool bInColorByCost);
 
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Settings")
+	float GetSlopePenalty() const { return RuntimeSettings.SlopePenalty; }
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Settings")
+	float GetTurnPenalty() const { return RuntimeSettings.TurnPenalty; }
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Settings")
+	float GetTargetStepSize() const { return RuntimeSettings.TargetStepSize_m; }
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Settings")
+	bool GetColorPathByCost() const { return RuntimeSettings.bColorPathByCost; }
+
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Path")
 	void ApplyViewScaleFromCamera(ARailSpectatorPawn* InPawn);
 
+	// Выбранная категория ЖД (по умолчанию — I Категория)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Settings")
 	ERailRoadCategory SelectedCategory = ERailRoadCategory::Category1;
 
@@ -69,7 +90,8 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Settings")
 	FRailRuntimeSettings RuntimeSettings;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Grid")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Grid",
+		meta = (ClampMin = "0.0", ClampMax = "2.0"))
 	float RecomputeDebounceSec = 0.2f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Endpoint")
@@ -79,42 +101,61 @@ protected:
 	float CurrentViewScale = 1.0f;
 	bool  bViewScaleReferenceCaptured = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Path")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Path",
+		meta = (ClampMin = "0.1", ClampMax = "20.0"))
 	float MinViewScale = 0.3f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Path")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Path",
+		meta = (ClampMin = "0.1", ClampMax = "20.0"))
 	float MaxViewScale = 6.0f;
 
 private:
 	void SetupSubsystems();
+	void SetupCostSummaryWidget();
 	void FindTerrain();
 	void SetupPathRenderer();
 	void SetupEndpoints();
 	void ApplySelectedCategory();
 
+	TArray<FVector> GenerateRailwayArcs(
+		const FRailGridData&	  InGrid,
+		const FRailPathResult&	  InPath,
+		const FRailCategoryNorms& InNorms,
+		float&					  OutMinPlanRadius_m,
+		float&					  OutMaxSlopePermille) const;
+
 	FRailGridData BuildGridFromTerrain(const AProceduralTerrain& InTerrain, float InTargetStep_m) const;
 	FRailGridData GenerateSyntheticGrid(int32 InSize, float InStepSize_m) const;
 
-	int32 WorldToNodeIndex(const FRailGridData& InGrid, const FVector& InWorldPos) const;
+	int32	WorldToNodeIndex(const FRailGridData& InGrid, const FVector& InWorldPos) const;
+	FVector NodeIndexToWorldXY(const FRailGridData& InGrid, int32 InNodeIndex) const;
 
 	UFUNCTION()
 	void HandleEndpointMoved(ARailEndpoint* Endpoint);
 
 	void HandleDeferredRecompute();
 
-	// Генератор дуг (Tangent-Curve-Tangent)
-	TArray<FVector> GenerateRailwayArcs(const FRailGridData& InGrid, const FRailPathResult& InPath, const FRailCategoryNorms& InNorms) const;
-
 	UPROPERTY()
 	TObjectPtr<UAStarPathFinder> PathFinder;
+
 	UPROPERTY()
 	TObjectPtr<UCostCalculator> CostCalculator;
+
+	UPROPERTY()
+	TObjectPtr<URailPathValidator> PathValidator;
+
+	UPROPERTY()
+	TObjectPtr<URailCostSummaryWidget> CostSummaryWidget;
+
 	UPROPERTY()
 	TObjectPtr<APathRenderer> PathRenderer;
+
 	UPROPERTY()
 	TObjectPtr<AProceduralTerrain> Terrain;
+
 	UPROPERTY()
 	TObjectPtr<ARailEndpoint> StartEndpoint;
+
 	UPROPERTY()
 	TObjectPtr<ARailEndpoint> EndEndpoint;
 

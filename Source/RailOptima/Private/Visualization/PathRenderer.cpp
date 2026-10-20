@@ -110,13 +110,9 @@ void APathRenderer::RenderColoredPath(const FRailGridData& InGrid, const FRailPa
 		FinalColors = RawColors;
 	}
 
-	BuildRibbon(FinalPoints, FinalColors, Width_cm, Height_cm);
-
-	if (PathMaterial)
-		PathMesh->SetMaterial(0, PathMaterial);
+	RenderCustomPath(FinalPoints, FinalColors);
 }
 
-// НОВЫЙ МЕТОД: Рендер готовых точек (из генератора дуг)
 void APathRenderer::RenderCustomPath(const TArray<FVector>& InPoints, const TArray<FLinearColor>& InColors)
 {
 	if (InPoints.Num() < 2 || InPoints.Num() != InColors.Num())
@@ -125,7 +121,10 @@ void APathRenderer::RenderCustomPath(const TArray<FVector>& InPoints, const TArr
 		return;
 	}
 
-	BuildRibbon(InPoints, InColors, Width_cm, Height_cm);
+	CachedRibbonPoints = InPoints;
+	CachedRibbonColors = InColors;
+
+	BuildRibbon(CachedRibbonPoints, CachedRibbonColors, Width_cm, Height_cm);
 
 	if (PathMaterial)
 		PathMesh->SetMaterial(0, PathMaterial);
@@ -133,6 +132,8 @@ void APathRenderer::RenderCustomPath(const TArray<FVector>& InPoints, const TArr
 
 void APathRenderer::ClearPath()
 {
+	CachedRibbonPoints.Reset();
+	CachedRibbonColors.Reset();
 	if (PathMesh)
 		PathMesh->ClearAllMeshSections();
 }
@@ -146,13 +147,19 @@ void APathRenderer::SetViewScale(float InScale)
 	ViewScale = NewScale;
 	Width_cm = BaseWidth_cm * ViewScale;
 	Height_cm = BaseHeight_cm * ViewScale;
+
+	if (CachedRibbonPoints.Num() >= 2 && CachedRibbonPoints.Num() == CachedRibbonColors.Num())
+	{
+		BuildRibbon(CachedRibbonPoints, CachedRibbonColors, Width_cm, Height_cm);
+	}
 }
 
 FLinearColor APathRenderer::EvaluateColor(float InT) const
 {
-	if (InT < 0.5f)
-		return FMath::Lerp(CheapColor, MidColor, InT * 2.0f);
-	return FMath::Lerp(MidColor, ExpensiveColor, (InT - 0.5f) * 2.0f);
+	const float ClampedT = FMath::Clamp(InT, 0.0f, 1.0f);
+	if (ClampedT < 0.5f)
+		return FMath::Lerp(CheapColor, MidColor, ClampedT * 2.0f);
+	return FMath::Lerp(MidColor, ExpensiveColor, (ClampedT - 0.5f) * 2.0f);
 }
 
 FVector APathRenderer::GridNodeToWorld(const FRailGridNode& InNode, float InStepSize_m) const
@@ -260,16 +267,19 @@ void APathRenderer::BuildRibbon(const TArray<FVector>& InPoints, const TArray<FL
 		Normals.Add(FVector::UpVector);
 		UVs.Add(FVector2D(0.0f, static_cast<float>(i)));
 		Tangents.Add(Tangent);
+
 		Vertices.Add(RTop);
 		VertColors.Add(InColors[i]);
 		Normals.Add(FVector::UpVector);
 		UVs.Add(FVector2D(1.0f, static_cast<float>(i)));
 		Tangents.Add(Tangent);
+
 		Vertices.Add(L);
 		VertColors.Add(InColors[i]);
 		Normals.Add(FVector(-Perp.X, -Perp.Y, 0.0f));
 		UVs.Add(FVector2D(0.0f, static_cast<float>(i)));
 		Tangents.Add(Tangent);
+
 		Vertices.Add(R);
 		VertColors.Add(InColors[i]);
 		Normals.Add(FVector(Perp.X, Perp.Y, 0.0f));
@@ -297,12 +307,14 @@ void APathRenderer::BuildRibbon(const TArray<FVector>& InPoints, const TArray<FL
 		Triangles.Add(RTop0);
 		Triangles.Add(RTop1);
 		Triangles.Add(LTop1);
+
 		Triangles.Add(LTop0);
 		Triangles.Add(LBot0);
 		Triangles.Add(LTop1);
 		Triangles.Add(LBot0);
 		Triangles.Add(LBot1);
 		Triangles.Add(LTop1);
+
 		Triangles.Add(RTop0);
 		Triangles.Add(RTop1);
 		Triangles.Add(RBot0);

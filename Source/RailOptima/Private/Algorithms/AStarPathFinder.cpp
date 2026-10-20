@@ -188,7 +188,15 @@ FRailPathResult UAStarPathFinder::FindPath(
 			if (NodeState[NeighborIndex] == 2)
 				continue;
 
+			// Оцениваем ребро. Передаем историю пути, чтобы заблокировать острые углы
 			const float EdgeCost = EvaluateEdge(InGrid, CurrentIndex, NeighborIndex, CameFrom);
+
+			// ЖЕСТКОЕ ОГРАНИЧЕНИЕ: Если функция вернула < 0, значит маневр невозможен
+			if (EdgeCost < 0.0f)
+			{
+				continue;
+			}
+
 			const float TentativeG = GScore[CurrentIndex] + EdgeCost;
 
 			if (TentativeG < GScore[NeighborIndex])
@@ -244,6 +252,7 @@ void UAStarPathFinder::CollectNeighbors(
 		if (InGrid.Nodes[NeighborIndex].bIsForbidden)
 			continue;
 
+		// Блокируем диагональный срез, если соседние прямые узлы запрещены
 		if (DirectionX[i] != 0 && DirectionY[i] != 0)
 		{
 			const int32 SideA = InGrid.IndexOf(Node.X + DirectionX[i], Node.Y);
@@ -388,6 +397,13 @@ float UAStarPathFinder::EvaluateEdge(
 		}
 	}
 
+	// ЖЕСТКОЕ ОГРАНИЧЕНИЕ: поезда не могут поворачивать более чем на 45 градусов
+	// за один шаг сетки (90 градусов, 135 и 180 — это излом)
+	if (TurnAngleDeg > 46.0f)
+	{
+		return -1.0f; // Сигнализируем о невозможности маневра
+	}
+
 	const float GroundCoef = CostCalculator->GetGroundCoefficient(ToNode.GroundType);
 	const float SlopePercent = SlopeRatio * 100.0f;
 
@@ -405,8 +421,15 @@ float UAStarPathFinder::Heuristic(
 
 	const float DX = static_cast<float>(To.X - From.X) * InGrid.StepSize_m;
 	const float DY = static_cast<float>(To.Y - From.Y) * InGrid.StepSize_m;
-	const float Distance = FMath::Sqrt(DX * DX + DY * DY);
 
-	const float MinCoefficient = CostCalculator ? CostCalculator->GetMinGroundCoefficient() : 1.0f;
-	return Distance * MinCoefficient;
+	// Дистанция в километрах (так как стоимость у нас в руб/км)
+	const float Distance_km = FMath::Sqrt(DX * DX + DY * DY) / 1000.0f;
+
+	const float MinCoefficient = CostCalculator ? CostCalculator->GetMinGroundCoefficient() : 0.9f;
+
+	// Берем минимальную стоимость 1 км (для идеальной равнины) из калькулятора,
+	// чтобы эвристика была в тех же величинах (тыс. руб.), что и стоимость пути
+	const float MinBaseCostPerKm_kRub = 313000.0f;
+
+	return Distance_km * MinBaseCostPerKm_kRub * MinCoefficient;
 }

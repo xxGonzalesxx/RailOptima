@@ -132,8 +132,8 @@ private:
 	// Текущий масштаб вида.
 	float ViewScale = 1.0f;
 
-	static constexpr float MinViewScale = 0.3f;
-	static constexpr float MaxViewScale = 6.0f;
+	static constexpr float MinViewScale = 10.0f;
+	static constexpr float MaxViewScale = 100.0f;
 
 	// ─────────────────────────────────────────────────────────────────
 	//  Внутренняя логика

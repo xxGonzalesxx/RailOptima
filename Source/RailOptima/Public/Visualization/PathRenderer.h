@@ -40,7 +40,6 @@ public:
 		float				   InLowValue,
 		float				   InHighValue);
 
-	// НОВЫЙ МЕТОД: Рендер произвольного массива точек (для генератора дуг)
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Path")
 	void RenderCustomPath(const TArray<FVector>& InPoints, const TArray<FLinearColor>& InColors);
 
@@ -53,9 +52,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "RailOptima|Path")
 	float GetViewScale() const { return ViewScale; }
 
-	// ─────────────────────────────────────────────────────────────────
-	//  Геометрия
-	// ─────────────────────────────────────────────────────────────────
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Path")
+	FLinearColor EvaluateColor(float InT) const;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Geometry",
 		meta = (ClampMin = "10.0", UIMin = "100.0", UIMax = "20000.0"))
@@ -76,20 +74,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Geometry")
 	FVector GridWorldOrigin = FVector::ZeroVector;
 
-	// ─────────────────────────────────────────────────────────────────
-	//  Сглаживание (для A* сетки)
-	// ─────────────────────────────────────────────────────────────────
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Smoothing")
 	bool bSmoothPath = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Smoothing",
 		meta = (ClampMin = "1", ClampMax = "16", EditCondition = "bSmoothPath"))
 	int32 SamplesPerSegment = 4;
-
-	// ─────────────────────────────────────────────────────────────────
-	//  Материал и цвета
-	// ─────────────────────────────────────────────────────────────────
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Appearance")
 	TObjectPtr<UMaterialInterface> PathMaterial;
@@ -123,10 +113,11 @@ private:
 	float BaseHeight_cm = 0.0f;
 	float ViewScale = 1.0f;
 
+	TArray<FVector>		 CachedRibbonPoints;
+	TArray<FLinearColor> CachedRibbonColors;
+
 	static constexpr float MinViewScale = 0.3f;
 	static constexpr float MaxViewScale = 6.0f;
-
-	FLinearColor EvaluateColor(float InT) const;
 
 	FVector GridNodeToWorld(const FRailGridNode& InNode, float InStepSize_m) const;
 
