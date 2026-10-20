@@ -1,32 +1,13 @@
 import { Link } from '@tanstack/react-router'
 import { motion } from 'motion/react'
-import { TerrainScene } from '@/features/landing/TerrainScene'
+import { RailBuildScene } from '@/features/landing/RailBuildScene'
 import { CursorGlow } from '@/features/landing/CursorGlow'
-import { CostCalculator } from '@/features/landing/CostCalculator'
 
 const stats = [
-  { value: '66 мс', label: 'A* на сетке 512×512', hint: 'при критерии < 1 сек по ТЗ' },
+  { value: 'Авто', label: 'Расчёт по СНиП и ГОСТ', hint: 'без ручных таблиц' },
   { value: '9', label: 'типов грунта', hint: '4 базовых + 5 расширенных' },
   { value: 'O(log n)', label: 'обновление приоритета', hint: 'собственная бинарная куча' },
-  { value: '2026', label: 'стек технологий', hint: 'Spring Boot 4 · React 19 · Unreal' },
-]
-
-const features = [
-  {
-    title: '3D-клиент на Unreal Engine',
-    description:
-      'Проектирование трассы в реальном рельефе: A*-поиск пути, учёт уклонов и типов грунта, визуализация маршрута в реальном времени.',
-  },
-  {
-    title: 'Расчёт по СНиП и ГОСТ',
-    description:
-      'Стоимость и параметры трассы считаются по нормативной формуле — длина, уклон, грунт, угол поворота — без ручных таблиц.',
-  },
-  {
-    title: 'Единый REST API',
-    description:
-      'Десктопный клиент и веб-платформа работают через общий бэкенд на Spring Boot — один источник правды для всех проектов.',
-  },
+  { value: '2026', label: 'старт проекта' },
 ]
 
 const steps = [
@@ -62,7 +43,7 @@ export function LandingPage() {
 
       <section className="relative mx-auto flex min-h-[85vh] max-w-7xl flex-col items-center justify-center px-6 text-center">
         <div className="absolute inset-0 bg-grid [mask-image:radial-gradient(ellipse_60%_60%_at_50%_30%,black,transparent)]" />
-        <TerrainScene />
+        <RailBuildScene />
 
         <motion.div
           initial="hidden"
@@ -96,7 +77,7 @@ export function LandingPage() {
               Начать проект
             </Link>
             <a
-              href="#features"
+              href="#how-it-works"
               className="rounded-full border border-white/15 px-7 py-3 text-sm font-medium text-white/80 transition hover:border-white/30"
             >
               Узнать больше
@@ -119,46 +100,13 @@ export function LandingPage() {
             >
               <p className="font-mono text-2xl font-bold text-amber-300">{s.value}</p>
               <p className="mt-1 text-sm font-medium text-white">{s.label}</p>
-              <p className="mt-1 text-xs text-white/40">{s.hint}</p>
+              {s.hint && <p className="mt-1 text-xs text-white/40">{s.hint}</p>}
             </motion.div>
           ))}
         </div>
       </section>
 
-      <section id="features" className="relative z-10 mx-auto max-w-7xl px-6 py-16">
-        <motion.h2
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          variants={fadeUp}
-          transition={{ duration: 0.5 }}
-          className="font-[var(--font-display)] text-3xl font-bold text-white sm:text-4xl"
-        >
-          Всё, что нужно инженеру
-        </motion.h2>
-        <div className="mt-12 grid gap-6 sm:grid-cols-3">
-          {features.map((f, i) => (
-            <motion.div
-              key={f.title}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: '-80px' }}
-              variants={fadeUp}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="group rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-xl transition hover:border-red-400/30 hover:bg-white/[0.05]"
-            >
-              <h3 className="font-[var(--font-display)] text-lg font-semibold text-white">{f.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-white/55">{f.description}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      <section className="relative z-10 mx-auto max-w-7xl px-6 py-16">
-        <CostCalculator />
-      </section>
-
-      <section className="relative z-10 mx-auto max-w-7xl px-6 py-24">
+      <section id="how-it-works" className="relative z-10 mx-auto max-w-7xl px-6 py-24">
         <h2 className="font-[var(--font-display)] text-3xl font-bold text-white sm:text-4xl">Как это работает</h2>
         <div className="mt-12 grid gap-8 sm:grid-cols-3">
           {steps.map((s, i) => (
