@@ -33,6 +33,10 @@ public:
 
 	virtual void BeginPlay() override;
 	virtual void PlayerTick(float DeltaTime) override;
+	virtual void SetupInputComponent() override;
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Camera")
+	void CenterCameraOnTerrain();
 
 protected:
 	// ─────────────────────────────────────────────────────────────────
@@ -63,6 +67,7 @@ private:
 
 	void HandlePrimaryPressed();
 	void HandlePrimaryReleased();
+	void HandleEscapePressed();
 
 	// ─────────────────────────────────────────────────────────────────
 	//  Трассы

@@ -128,6 +128,20 @@ bool AProceduralTerrain::BuildFromHeightmap(const FString& InHeightMapPath)
 	return true;
 }
 
+bool AProceduralTerrain::LoadTerrainFromFiles(const FString& InHeightmapFullPath, const FString& InMetaFullPath)
+{
+	ClearTerrain();
+	if (!InMetaFullPath.IsEmpty() && FPaths::FileExists(InMetaFullPath))
+	{
+		LoadRegionMetadataFromFile(InMetaFullPath);
+	}
+	if (!InHeightmapFullPath.IsEmpty() && FPaths::FileExists(InHeightmapFullPath))
+	{
+		return BuildFromHeightmap(InHeightmapFullPath);
+	}
+	return false;
+}
+
 void AProceduralTerrain::ClearTerrain()
 {
 	if (TerrainMesh)

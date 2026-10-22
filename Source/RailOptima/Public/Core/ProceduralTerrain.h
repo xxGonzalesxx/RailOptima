@@ -74,6 +74,9 @@ public:
 	bool BuildFromHeightmap(const FString& InHeightMapPath);
 
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Terrain")
+	bool LoadTerrainFromFiles(const FString& InHeightmapFullPath, const FString& InMetaFullPath);
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Terrain")
 	void ClearTerrain();
 
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "RailOptima|Terrain")

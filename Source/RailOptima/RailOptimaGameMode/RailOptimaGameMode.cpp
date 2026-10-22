@@ -15,9 +15,16 @@
 #include "Interactive/RailOptimaPlayerController.h"
 #include "Interactive/RailSpectatorPawn.h"
 #include "Kismet/GameplayStatics.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Services/RailProjectManager.h"
 #include "TimerManager.h"
+#include "UI/RailMainMenuWidget.h"
+#include "UI/RailPauseMenuWidget.h"
+#include "UI/RailToastWidget.h"
 #include "Visualization/PathRenderer.h"
 #include "Visualization/RailCostSummaryWidget.h"
+#include "Visualization/RoadRenderer.h"
 
 ARailOptimaGameMode::ARailOptimaGameMode()
 {
@@ -34,7 +41,24 @@ void ARailOptimaGameMode::BeginPlay()
 	SetupPathRenderer();
 	SetupEndpoints();
 	SetupCostSummaryWidget();
-	RecomputePath();
+
+	// Скрываем маркеры и виджет сметы до открытия конкретного проекта пользователем
+	if (StartEndpoint)
+	{
+		StartEndpoint->SetActorHiddenInGame(true);
+	}
+	if (EndEndpoint)
+	{
+		EndEndpoint->SetActorHiddenInGame(true);
+	}
+	if (CostSummaryWidget)
+	{
+		CostSummaryWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	SetupGlobalToastWidget();
+	SetupPauseMenuWidget();
+	SetupMainMenuWidget();
 }
 
 void ARailOptimaGameMode::SetupCostSummaryWidget()
@@ -52,6 +76,358 @@ void ARailOptimaGameMode::SetupCostSummaryWidget()
 		CostSummaryWidget->AddToViewport(10);
 		UE_LOG(LogTemp, Log, TEXT("[RailGM] UI-виджет сметы URailCostSummaryWidget добавлен на экран."));
 	}
+}
+
+void ARailOptimaGameMode::SetupGlobalToastWidget()
+{
+	if (GlobalToastWidget)
+		return;
+
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PC)
+		return;
+
+	GlobalToastWidget = CreateWidget<URailToastWidget>(PC, URailToastWidget::StaticClass());
+	if (GlobalToastWidget)
+	{
+		GlobalToastWidget->AddToViewport(100);
+	}
+}
+
+void ARailOptimaGameMode::SetupMainMenuWidget()
+{
+	if (MainMenuWidget)
+	{
+		MainMenuWidget->SetVisibility(ESlateVisibility::Visible);
+		MainMenuWidget->RefreshProjectLibrary();
+		return;
+	}
+
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PC)
+		return;
+
+	MainMenuWidget = CreateWidget<URailMainMenuWidget>(PC, URailMainMenuWidget::StaticClass());
+	if (MainMenuWidget)
+	{
+		MainMenuWidget->AddToViewport(50);
+		MainMenuWidget->OnProjectOpened.AddDynamic(this, &ARailOptimaGameMode::HandleProjectOpenedFromMenu);
+	}
+}
+
+void ARailOptimaGameMode::SetupPauseMenuWidget()
+{
+	if (PauseMenuWidget)
+		return;
+
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PC)
+		return;
+
+	PauseMenuWidget = CreateWidget<URailPauseMenuWidget>(PC, URailPauseMenuWidget::StaticClass());
+	if (PauseMenuWidget)
+	{
+		PauseMenuWidget->AddToViewport(60);
+		PauseMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
+
+		PauseMenuWidget->OnResumeClicked.AddDynamic(this, &ARailOptimaGameMode::HandlePauseResume);
+		PauseMenuWidget->OnSaveProjectClicked.AddDynamic(this, &ARailOptimaGameMode::HandlePauseSave);
+		PauseMenuWidget->OnExportExcelClicked.AddDynamic(this, &ARailOptimaGameMode::HandlePauseExportExcel);
+		PauseMenuWidget->OnReturnToMainMenuClicked.AddDynamic(this, &ARailOptimaGameMode::HandlePauseReturnToMenu);
+	}
+}
+
+void ARailOptimaGameMode::ShowToast(const FString& Message, ERailToastType Type, float DurationSec)
+{
+	if (GlobalToastWidget)
+	{
+		GlobalToastWidget->ShowToast(Message, Type, DurationSec);
+	}
+	else if (MainMenuWidget)
+	{
+		MainMenuWidget->ShowToast(Message, Type, DurationSec);
+	}
+}
+
+void ARailOptimaGameMode::OpenProject(const FRailProjectMetadata& InProject)
+{
+	bIsProjectActive = true;
+	CurrentActiveProject = InProject;
+
+	// Установка категории
+	SelectedCategory = InProject.Category;
+	ApplySelectedCategory();
+
+	// Очищаем старую сетку и геометрию пути
+	bGridCached = false;
+	CachedGrid = FRailGridData();
+	if (PathRenderer)
+	{
+		PathRenderer->ClearPath();
+	}
+
+	// Загружаем ландшафт
+	if (Terrain)
+	{
+		bool bLoaded = Terrain->LoadTerrainFromFiles(InProject.HeightmapPath, InProject.MetaPath);
+		if (!bLoaded)
+		{
+			ShowToast(FString::Printf(TEXT("Внимание: карта высот не найдена: %s"), *InProject.HeightmapPath), ERailToastType::Warning);
+		}
+	}
+
+	// Загрузка линейных слоев (дороги, реки)
+	TArray<AActor*> RoadRenderers;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ARoadRenderer::StaticClass(), RoadRenderers);
+
+	ARoadRenderer* RoadActor = nullptr;
+	ARoadRenderer* RiverActor = nullptr;
+	for (AActor* Actor : RoadRenderers)
+	{
+		ARoadRenderer* RR = Cast<ARoadRenderer>(Actor);
+		if (!RR) continue;
+		RR->ClearGeometry();
+		if (RR->FeatureType == ERoadFeatureType::Road && !RoadActor)
+		{
+			RoadActor = RR;
+		}
+		else if (RR->FeatureType == ERoadFeatureType::River && !RiverActor)
+		{
+			RiverActor = RR;
+		}
+	}
+
+	if (InProject.bHasRoads && !InProject.RoadsPath.IsEmpty() && FPaths::FileExists(InProject.RoadsPath))
+	{
+		if (RoadActor)
+		{
+			RoadActor->LoadAndBuild(InProject.RoadsPath);
+		}
+	}
+
+	if (InProject.bHasRivers && !InProject.RiversPath.IsEmpty() && FPaths::FileExists(InProject.RiversPath))
+	{
+		if (RiverActor)
+		{
+			RiverActor->LoadAndBuild(InProject.RiversPath);
+		}
+	}
+
+	// Позиционируем маркеры старта и финиша
+	const float MapSize_m = Terrain ? Terrain->GetMapSizeMeters() : 30000.0f;
+	const float MapSize_cm = MapSize_m * 100.0f;
+
+	if (StartEndpoint)
+	{
+		StartEndpoint->SetActorHiddenInGame(false);
+		if (!InProject.StartPoint.IsNearlyZero())
+		{
+			StartEndpoint->SetActorLocation(InProject.StartPoint);
+		}
+		else
+		{
+			const FVector2D S2D(MapSize_cm * 0.2f, MapSize_cm * 0.2f);
+			float StartZ = 0.0f;
+			if (Terrain) Terrain->SampleTerrainZ_cm(S2D, StartZ);
+			StartEndpoint->SetActorLocation(FVector(S2D.X, S2D.Y, StartZ + 8000.0f));
+		}
+	}
+
+	if (EndEndpoint)
+	{
+		EndEndpoint->SetActorHiddenInGame(false);
+		if (!InProject.EndPoint.IsNearlyZero())
+		{
+			EndEndpoint->SetActorLocation(InProject.EndPoint);
+		}
+		else
+		{
+			const FVector2D E2D(MapSize_cm * 0.8f, MapSize_cm * 0.8f);
+			float EndZ = 0.0f;
+			if (Terrain) Terrain->SampleTerrainZ_cm(E2D, EndZ);
+			EndEndpoint->SetActorLocation(FVector(E2D.X, E2D.Y, EndZ + 8000.0f));
+		}
+	}
+
+	// Центрируем камеру
+	if (ARailOptimaPlayerController* PC = Cast<ARailOptimaPlayerController>(UGameplayStatics::GetPlayerController(this, 0)))
+	{
+		PC->CenterCameraOnTerrain();
+	}
+
+	// Показываем виджет сметы
+	if (CostSummaryWidget)
+	{
+		CostSummaryWidget->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
+
+	// Пересчитываем трассировку
+	RecomputePath();
+
+	// Скрываем главное меню и паузу
+	if (MainMenuWidget)
+	{
+		MainMenuWidget->HideLoadingOverlay();
+		MainMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	if (PauseMenuWidget)
+	{
+		PauseMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	ShowToast(FString::Printf(TEXT("Проект '%s' успешно загружен"), *InProject.ProjectName), ERailToastType::Success);
+}
+
+void ARailOptimaGameMode::SaveCurrentProject()
+{
+	if (!bIsProjectActive)
+	{
+		ShowToast(TEXT("Нет активного проекта для сохранения"), ERailToastType::Warning);
+		return;
+	}
+
+	if (StartEndpoint)
+	{
+		CurrentActiveProject.StartPoint = StartEndpoint->GetActorLocation();
+		CurrentActiveProject.bHasSavedEndpoints = true;
+	}
+	if (EndEndpoint)
+	{
+		CurrentActiveProject.EndPoint = EndEndpoint->GetActorLocation();
+	}
+
+	CurrentActiveProject.TotalLength_m = LastLength_m;
+	CurrentActiveProject.TotalCost_kRub = LastCost_kRub;
+	CurrentActiveProject.LastModified = FDateTime::Now();
+
+	bool bOk = URailProjectManager::SaveProject(CurrentActiveProject);
+	if (bOk)
+	{
+		ShowToast(FString::Printf(TEXT("Проект '%s' успешно сохранён"), *CurrentActiveProject.ProjectName), ERailToastType::Success);
+	}
+	else
+	{
+		ShowToast(TEXT("Ошибка при сохранении проекта!"), ERailToastType::Error);
+	}
+}
+
+void ARailOptimaGameMode::CloseCurrentProject()
+{
+	bIsProjectActive = false;
+
+	if (StartEndpoint)
+	{
+		StartEndpoint->SetActorHiddenInGame(true);
+	}
+	if (EndEndpoint)
+	{
+		EndEndpoint->SetActorHiddenInGame(true);
+	}
+	if (PathRenderer)
+	{
+		PathRenderer->ClearPath();
+	}
+	if (CostSummaryWidget)
+	{
+		CostSummaryWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	if (PauseMenuWidget)
+	{
+		PauseMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	SetupMainMenuWidget();
+}
+
+void ARailOptimaGameMode::ExportCostToExcel()
+{
+	if (!bIsProjectActive)
+	{
+		ShowToast(TEXT("Нет активного проекта для экспорта сметы"), ERailToastType::Warning);
+		return;
+	}
+
+	const FRailCategoryNorms Norms = FRailCategoryNorms::GetNorms(SelectedCategory);
+	FString CsvContent;
+	CsvContent += FString::Printf(TEXT("СВОДНАЯ ВЕДОМОСТЬ СМЕТНОЙ СТОИМОСТИ СТРОИТЕЛЬСТВА ЖЕЛЕЗНОДОРОЖНОГО ПУТИ\n"));
+	CsvContent += FString::Printf(TEXT("Проект;%s\n"), *CurrentActiveProject.ProjectName);
+	CsvContent += FString::Printf(TEXT("Категория линии;%s;%s\n"), *Norms.CategoryName, TEXT("СП 119.13330.2017"));
+	CsvContent += FString::Printf(TEXT("Нормативный документ ценообразования;НЦС 81-02-07-2025;Минстрой России\n"));
+	CsvContent += FString::Printf(TEXT("Дата расчета;%s\n\n"), *FDateTime::Now().ToString(TEXT("%d.%m.%Y %H:%M")));
+
+	CsvContent += TEXT("Параметр;Значение;Единица измерения;Нормативное ограничение\n");
+	CsvContent += FString::Printf(TEXT("Длина трассы;%.2f;м;-\n"), LastLength_m);
+	CsvContent += FString::Printf(TEXT("Длина трассы;%.3f;км;-\n"), LastLength_m / 1000.0);
+	CsvContent += FString::Printf(TEXT("Максимальный продольный уклон;%.1f;‰;не более %.1f ‰\n"), LastMaxSlope_perm, Norms.MaxSlopePermille);
+	CsvContent += FString::Printf(TEXT("Минимальный радиус кривой в плане;%.0f;м;не менее %.0f м\n"), LastMinRadius_m, Norms.MinRadiusDifficult);
+	CsvContent += FString::Printf(TEXT("Сметная стоимость (НЦС);%.2f;млн. руб.;-\n"), (LastCost_kRub / 1000.0));
+	const double AvgRatePerKm = (LastLength_m > 0.0) ? (LastCost_kRub / (LastLength_m / 1000.0)) : 0.0;
+	CsvContent += FString::Printf(TEXT("Удельная стоимость;%.2f;млн. руб./км;-\n"), AvgRatePerKm / 1000.0);
+	CsvContent += FString::Printf(TEXT("Время трассировки A*;%.1f;мс;-\n"), LastCalcTime_ms);
+
+	const FString ExportFilePath = FPaths::Combine(CurrentActiveProject.ProjectPath, TEXT("estimate_export.csv"));
+	bool bSaved = FFileHelper::SaveStringToFile(CsvContent, *ExportFilePath, FFileHelper::EEncodingOptions::ForceUTF8);
+	if (bSaved)
+	{
+		ShowToast(FString::Printf(TEXT("Смета успешно экспортирована в Excel: %s"), *ExportFilePath), ERailToastType::Success, 6.0f);
+	}
+	else
+	{
+		ShowToast(TEXT("Не удалось записать файл сметы на диск!"), ERailToastType::Error);
+	}
+}
+
+void ARailOptimaGameMode::TogglePauseMenu()
+{
+	if (!bIsProjectActive)
+	{
+		if (MainMenuWidget)
+		{
+			MainMenuWidget->CloseOpenModals();
+		}
+		return;
+	}
+
+	if (PauseMenuWidget)
+	{
+		if (PauseMenuWidget->GetVisibility() == ESlateVisibility::Visible)
+		{
+			PauseMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+		else
+		{
+			PauseMenuWidget->SetProjectInfo(CurrentActiveProject);
+			PauseMenuWidget->SetVisibility(ESlateVisibility::Visible);
+		}
+	}
+}
+
+void ARailOptimaGameMode::HandleProjectOpenedFromMenu(const FRailProjectMetadata& ProjectMeta)
+{
+	OpenProject(ProjectMeta);
+}
+
+void ARailOptimaGameMode::HandlePauseResume()
+{
+	if (PauseMenuWidget)
+	{
+		PauseMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void ARailOptimaGameMode::HandlePauseSave()
+{
+	SaveCurrentProject();
+}
+
+void ARailOptimaGameMode::HandlePauseExportExcel()
+{
+	ExportCostToExcel();
+}
+
+void ARailOptimaGameMode::HandlePauseReturnToMenu()
+{
+	CloseCurrentProject();
 }
 
 void ARailOptimaGameMode::ApplySettings(float InSlopePenalty, float InTurnPenalty, float InStepSize_m, bool bInColorByCost)
@@ -259,6 +635,12 @@ void ARailOptimaGameMode::RecomputePath()
 
 	if (StartIdx == INDEX_NONE || EndIdx == INDEX_NONE || StartIdx == EndIdx)
 	{
+		LastLength_m = 0.0;
+		LastCost_kRub = 0.0;
+		LastMaxSlope_perm = 0.0f;
+		LastMinRadius_m = 0.0f;
+		LastCalcTime_ms = 0.0;
+
 		PathRenderer->ClearPath();
 		if (CostSummaryWidget)
 		{
@@ -289,6 +671,12 @@ void ARailOptimaGameMode::RecomputePath()
 
 	if (!Result.bFound)
 	{
+		LastLength_m = 0.0;
+		LastCost_kRub = 0.0;
+		LastMaxSlope_perm = 0.0f;
+		LastMinRadius_m = 0.0f;
+		LastCalcTime_ms = Ms;
+
 		PathRenderer->ClearPath();
 		if (CostSummaryWidget)
 		{
@@ -362,6 +750,12 @@ void ARailOptimaGameMode::RecomputePath()
 	}
 
 	// 6. Обновляем UI-табличку со сметой НЦС 81-02-07-2025
+	LastLength_m = Result.TotalLength_m;
+	LastCost_kRub = Result.TotalCost;
+	LastMaxSlope_perm = MaxSlopePermille;
+	LastMinRadius_m = MinPlanRadius_m;
+	LastCalcTime_ms = Ms;
+
 	if (CostSummaryWidget)
 	{
 		CostSummaryWidget->UpdateRouteSummary(

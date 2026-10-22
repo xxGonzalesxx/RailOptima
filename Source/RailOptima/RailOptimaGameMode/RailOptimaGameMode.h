@@ -10,6 +10,8 @@
 #include "Algorithms/RailPathValidator.h"
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "Services/RailProjectTypes.h"
+#include "UI/RailToastWidget.h"
 #include "RailOptimaGameMode.generated.h"
 
 class APathRenderer;
@@ -18,6 +20,8 @@ class ARailEndpoint;
 class ARailOptimaPlayerController;
 class ARailSpectatorPawn;
 class URailCostSummaryWidget;
+class URailMainMenuWidget;
+class URailPauseMenuWidget;
 
 DECLARE_MULTICAST_DELEGATE_FourParams(FRailPathRecomputedSignature,
 	double /*Length_m*/, double /*Cost_kRub*/, double /*TimeMs*/, int32 /*Nodes*/);
@@ -84,6 +88,34 @@ public:
 	UFUNCTION(BlueprintPure, Category = "RailOptima|Settings")
 	ERailRoadCategory GetSelectedCategory() const { return SelectedCategory; }
 
+	// ─────────────────────────────────────────────────────────────────
+	//  Управление проектами и UI
+	// ─────────────────────────────────────────────────────────────────
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Project")
+	void OpenProject(const FRailProjectMetadata& InProject);
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Project")
+	void SaveCurrentProject();
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Project")
+	void CloseCurrentProject();
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Project")
+	void ExportCostToExcel();
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|UI")
+	void TogglePauseMenu();
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|UI")
+	void ShowToast(const FString& Message, ERailToastType Type = ERailToastType::Info, float DurationSec = 4.5f);
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Project")
+	bool IsProjectActive() const { return bIsProjectActive; }
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Project")
+	const FRailProjectMetadata& GetActiveProject() const { return CurrentActiveProject; }
+
 	FRailPathRecomputedSignature OnPathRecomputed;
 
 protected:
@@ -134,6 +166,45 @@ private:
 	void HandleEndpointMoved(ARailEndpoint* Endpoint);
 
 	void HandleDeferredRecompute();
+
+	// Настройка меню и тостов
+	void SetupMainMenuWidget();
+	void SetupPauseMenuWidget();
+	void SetupGlobalToastWidget();
+
+	UFUNCTION()
+	void HandleProjectOpenedFromMenu(const FRailProjectMetadata& ProjectMeta);
+
+	UFUNCTION()
+	void HandlePauseResume();
+
+	UFUNCTION()
+	void HandlePauseSave();
+
+	UFUNCTION()
+	void HandlePauseExportExcel();
+
+	UFUNCTION()
+	void HandlePauseReturnToMenu();
+
+	UPROPERTY()
+	TObjectPtr<URailMainMenuWidget> MainMenuWidget;
+
+	UPROPERTY()
+	TObjectPtr<URailPauseMenuWidget> PauseMenuWidget;
+
+	UPROPERTY()
+	TObjectPtr<URailToastWidget> GlobalToastWidget;
+
+	bool bIsProjectActive = false;
+	FRailProjectMetadata CurrentActiveProject;
+
+	// Кэш последнего расчёта для сметы
+	double LastLength_m = 0.0;
+	double LastCost_kRub = 0.0;
+	float  LastMaxSlope_perm = 0.0f;
+	float  LastMinRadius_m = 0.0f;
+	double LastCalcTime_ms = 0.0;
 
 	UPROPERTY()
 	TObjectPtr<UAStarPathFinder> PathFinder;

@@ -77,6 +77,37 @@ void ARailOptimaPlayerController::BeginPlay()
 		return;
 	}
 
+	CenterCameraOnTerrain();
+}
+
+void ARailOptimaPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+	if (InputComponent)
+	{
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ARailOptimaPlayerController::HandleEscapePressed);
+	}
+}
+
+void ARailOptimaPlayerController::HandleEscapePressed()
+{
+	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		GM->TogglePauseMenu();
+	}
+}
+
+void ARailOptimaPlayerController::CenterCameraOnTerrain()
+{
+	if (!SubscribedPawn)
+	{
+		SubscribedPawn = Cast<ARailSpectatorPawn>(GetPawn());
+	}
+	if (!SubscribedPawn)
+	{
+		return;
+	}
+
 	TArray<AActor*> Found;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AProceduralTerrain::StaticClass(), Found);
 
