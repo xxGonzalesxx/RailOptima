@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Николайчик А.В. Все права защищены.
+﻿// Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Реализация менеджера проектов RailOptima
 
 #include "Services/RailProjectManager.h"
@@ -298,44 +298,86 @@ bool URailProjectManager::CreateProjectFromPng(
 		FM.MakeDirectory(*ProjectDir, true);
 	}
 
-	const FString DestPng = ProjectDir / TEXT("heightmap.png");
-	if (FPaths::ConvertRelativePathToFull(InSourcePngPath) != DestPng)
+	FString FullSourcePath = FPaths::ConvertRelativePathToFull(InSourcePngPath);
+	FPaths::NormalizeFilename(FullSourcePath);
+
+	FString DestPng = ProjectDir / TEXT("heightmap.png");
+	FPaths::NormalizeFilename(DestPng);
+
+	if (FullSourcePath != DestPng)
 	{
-		if (!FM.Copy(*DestPng, *InSourcePngPath))
+		const uint32 CopyResult = FM.Copy(*DestPng, *FullSourcePath, /*Replace=*/true, /*EvenIfReadOnly=*/true);
+		if (CopyResult != 0)
 		{
-			OutErrorMessage = TEXT("Не удалось скопировать файл карты высот в папку проекта.");
+			OutErrorMessage = FString::Printf(TEXT("Не удалось скопировать файл карты высот в папку проекта (код %u): %s"), CopyResult, *FullSourcePath);
 			return false;
+		}
+	}
+
+	// Читаем размеры PNG из заголовка (байты 16-23: Width и Height в Big-Endian)
+	int32 PngWidth = 3600;
+	int32 PngHeight = 3600;
+	TArray<uint8> PngHeader;
+	if (FFileHelper::LoadFileToArray(PngHeader, *DestPng, FILEREAD_Silent))
+	{
+		if (PngHeader.Num() >= 24 && PngHeader[0] == 0x89 && PngHeader[1] == 'P' && PngHeader[2] == 'N' && PngHeader[3] == 'G')
+		{
+			PngWidth = (PngHeader[16] << 24) | (PngHeader[17] << 16) | (PngHeader[18] << 8) | PngHeader[19];
+			PngHeight = (PngHeader[20] << 24) | (PngHeader[21] << 16) | (PngHeader[22] << 8) | PngHeader[23];
 		}
 	}
 
 	// Копируем или создаем region_meta.json
 	const FString DestMeta = ProjectDir / TEXT("region_meta.json");
-	const FString SourceMetaNearby = FPaths::GetPath(InSourcePngPath) / TEXT("region_meta.json");
+	const FString SourceMetaNearby = FPaths::GetPath(FullSourcePath) / TEXT("region_meta.json");
 
 	if (FM.FileExists(*SourceMetaNearby))
 	{
-		FM.Copy(*DestMeta, *SourceMetaNearby);
+		FM.Copy(*DestMeta, *SourceMetaNearby, true, true);
 	}
 	else
 	{
-		// Дефолтные метаданные
-		FString DefaultMeta = TEXT("{\n  \"region_name\": \"") + InProjectName + TEXT("\",\n  \"min_elevation_m\": 0.0,\n  \"max_elevation_m\": 1000.0,\n  \"pixel_size_m\": 30.0,\n  \"width_px\": 3600,\n  \"height_px\": 3600\n}");
-		FFileHelper::SaveStringToFile(DefaultMeta, *DestMeta);
+		FString DefaultMeta = FString::Printf(
+			TEXT("{\n  \"region_name\": \"%s\",\n  \"min_elevation_m\": 0.0,\n  \"max_elevation_m\": 1500.0,\n  \"pixel_size_m\": 30.0,\n  \"width_px\": %d,\n  \"height_px\": %d\n}"),
+			*InProjectName, PngWidth, PngHeight);
+		FFileHelper::SaveStringToFile(DefaultMeta, *DestMeta, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 	}
 
-	// Копируем дороги и реки, если они есть рядом и были запрошены
-	const FString SourceRoadsNearby = FPaths::GetPath(InSourcePngPath) / TEXT("roads.geojson");
+	// Копируем дороги и реки, если они есть рядом или берем дефолтные из RawContent
 	const FString DestRoads = ProjectDir / TEXT("roads.geojson");
-	if (bLoadRoads && FM.FileExists(*SourceRoadsNearby))
+	if (bLoadRoads)
 	{
-		FM.Copy(*DestRoads, *SourceRoadsNearby);
+		const FString SourceRoadsNearby = FPaths::GetPath(FullSourcePath) / TEXT("roads.geojson");
+		if (FM.FileExists(*SourceRoadsNearby))
+		{
+			FM.Copy(*DestRoads, *SourceRoadsNearby, true, true);
+		}
+		else
+		{
+			const FString FallbackRoads = FPaths::ProjectDir() / TEXT("RawContent/roads.geojson");
+			if (FM.FileExists(*FallbackRoads))
+			{
+				FM.Copy(*DestRoads, *FallbackRoads, true, true);
+			}
+		}
 	}
 
-	const FString SourceRiversNearby = FPaths::GetPath(InSourcePngPath) / TEXT("rivers.geojson");
 	const FString DestRivers = ProjectDir / TEXT("rivers.geojson");
-	if (bLoadRivers && FM.FileExists(*SourceRiversNearby))
+	if (bLoadRivers)
 	{
-		FM.Copy(*DestRivers, *SourceRiversNearby);
+		const FString SourceRiversNearby = FPaths::GetPath(FullSourcePath) / TEXT("rivers.geojson");
+		if (FM.FileExists(*SourceRiversNearby))
+		{
+			FM.Copy(*DestRivers, *SourceRiversNearby, true, true);
+		}
+		else
+		{
+			const FString FallbackRivers = FPaths::ProjectDir() / TEXT("RawContent/rivers.geojson");
+			if (FM.FileExists(*FallbackRivers))
+			{
+				FM.Copy(*DestRivers, *FallbackRivers, true, true);
+			}
+		}
 	}
 
 	OutProject.ProjectName = InProjectName;

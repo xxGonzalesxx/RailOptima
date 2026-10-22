@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Николайчик А.В. Все права защищены.
+﻿// Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Дипломный проект
 // «Разработка программы проектирования железнодорожных путей: модуль визуализации»,
 // ПривГУПС, 2026.
@@ -22,6 +22,7 @@ class ARailSpectatorPawn;
 class URailCostSummaryWidget;
 class URailMainMenuWidget;
 class URailPauseMenuWidget;
+class URailGraphicsSettingsWidget;
 
 DECLARE_MULTICAST_DELEGATE_FourParams(FRailPathRecomputedSignature,
 	double /*Length_m*/, double /*Cost_kRub*/, double /*TimeMs*/, int32 /*Nodes*/);
@@ -108,6 +109,9 @@ public:
 	void TogglePauseMenu();
 
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|UI")
+	void ShowGraphicsSettings();
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|UI")
 	void ShowToast(const FString& Message, ERailToastType Type = ERailToastType::Info, float DurationSec = 4.5f);
 
 	UFUNCTION(BlueprintPure, Category = "RailOptima|Project")
@@ -171,6 +175,10 @@ private:
 	void SetupMainMenuWidget();
 	void SetupPauseMenuWidget();
 	void SetupGlobalToastWidget();
+	void SetupGraphicsSettingsWidget();
+
+	UFUNCTION()
+	void HandleGraphicsSettingsApplied();
 
 	UFUNCTION()
 	void HandleProjectOpenedFromMenu(const FRailProjectMetadata& ProjectMeta);
@@ -195,6 +203,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<URailToastWidget> GlobalToastWidget;
+
+	UPROPERTY()
+	TObjectPtr<URailGraphicsSettingsWidget> GraphicsSettingsWidget;
 
 	bool bIsProjectActive = false;
 	FRailProjectMetadata CurrentActiveProject;

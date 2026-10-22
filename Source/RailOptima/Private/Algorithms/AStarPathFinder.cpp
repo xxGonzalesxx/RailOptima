@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Николайчик А.В. Все права защищены.
+﻿// Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Дипломный проект
 // «Разработка программы проектирования железнодорожных путей: модуль визуализации»,
 // ПривГУПС, 2026.
@@ -79,7 +79,7 @@ namespace
 			InHeap[0] = InHeap[LastIndex];
 			InPositions[InHeap[0]] = 0;
 		}
-		InHeap.RemoveAt(LastIndex);
+		InHeap.Pop(EAllowShrinking::No);
 
 		if (InHeap.Num() > 0)
 		{
@@ -139,18 +139,33 @@ FRailPathResult UAStarPathFinder::FindPath(
 		return Result;
 	}
 
-	TArray<float> GScore;
-	TArray<float> FScore;
-	TArray<int32> CameFrom;
-	TArray<int8>  NodeState;
-	TArray<int32> OpenHeap;
-	TArray<int32> HeapPositions;
+	if (CachedGScore.Num() != NumNodes)
+	{
+		CachedGScore.SetNumUninitialized(NumNodes);
+		CachedFScore.SetNumUninitialized(NumNodes);
+		CachedCameFrom.SetNumUninitialized(NumNodes);
+		CachedNodeState.SetNumUninitialized(NumNodes);
+		CachedHeapPositions.SetNumUninitialized(NumNodes);
+	}
 
-	GScore.Init(TNumericLimits<float>::Max(), NumNodes);
-	FScore.Init(TNumericLimits<float>::Max(), NumNodes);
-	CameFrom.Init(INDEX_NONE, NumNodes);
-	NodeState.Init(0, NumNodes);
-	HeapPositions.Init(INDEX_NONE, NumNodes);
+	for (int32 i = 0; i < NumNodes; ++i)
+	{
+		CachedGScore[i] = TNumericLimits<float>::Max();
+		CachedFScore[i] = TNumericLimits<float>::Max();
+		CachedCameFrom[i] = INDEX_NONE;
+		CachedNodeState[i] = 0;
+		CachedHeapPositions[i] = INDEX_NONE;
+	}
+
+	CachedOpenHeap.Reset();
+	CachedOpenHeap.Reserve(4096);
+
+	TArray<float>& GScore = CachedGScore;
+	TArray<float>& FScore = CachedFScore;
+	TArray<int32>& CameFrom = CachedCameFrom;
+	TArray<int8>&  NodeState = CachedNodeState;
+	TArray<int32>& OpenHeap = CachedOpenHeap;
+	TArray<int32>& HeapPositions = CachedHeapPositions;
 
 	GScore[InStartIndex] = 0.0f;
 	FScore[InStartIndex] = Heuristic(InGrid, InStartIndex, InEndIndex);

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Николайчик А.В. Все права защищены.
+﻿// Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Меню паузы (Esc) в рабочем режиме проекта
 
 #pragma once
@@ -32,6 +32,9 @@ public:
 	FOnRailPauseActionSignature OnResumeClicked;
 
 	UPROPERTY(BlueprintAssignable, Category = "RailOptima|Events")
+	FOnRailPauseActionSignature OnGraphicsSettingsClicked;
+
+	UPROPERTY(BlueprintAssignable, Category = "RailOptima|Events")
 	FOnRailPauseActionSignature OnSaveProjectClicked;
 
 	UPROPERTY(BlueprintAssignable, Category = "RailOptima|Events")
@@ -46,6 +49,9 @@ public:
 private:
 	UFUNCTION()
 	void HandleResume();
+
+	UFUNCTION()
+	void HandleGraphicsSettings();
 
 	UFUNCTION()
 	void HandleSave();

@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Николайчик А.В. Все права защищены.
+﻿// Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Дипломный проект
 
 #include "Visualization/PathRenderer.h"

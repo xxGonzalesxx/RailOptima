@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Николайчик А.В. Все права защищены.
+﻿// Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Меню паузы (Esc) в рабочем режиме проекта
 
 #include "UI/RailPauseMenuWidget.h"
@@ -7,6 +7,7 @@
 #include "Components/Button.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/SizeBox.h"
 #include "Components/Spacer.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -42,15 +43,18 @@ TSharedRef<SWidget> URailPauseMenuWidget::RebuildWidget()
 		DimmerSlot->SetOffsets(FMargin(0.0f));
 
 		// Центральная карточка меню
+		USizeBox* CardSizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+		CardSizeBox->SetWidthOverride(460.0f);
+
 		UBorder* CardBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("CardBorder"));
 		CardBorder->SetBrushColor(FLinearColor(0.02f, 0.035f, 0.06f, 0.96f));
 		CardBorder->SetPadding(FMargin(28.0f, 24.0f));
+		CardSizeBox->SetContent(CardBorder);
 
-		UCanvasPanelSlot* CardSlot = RootCanvas->AddChildToCanvas(CardBorder);
+		UCanvasPanelSlot* CardSlot = RootCanvas->AddChildToCanvas(CardSizeBox);
 		CardSlot->SetAnchors(FAnchors(0.5f, 0.5f, 0.5f, 0.5f));
 		CardSlot->SetAlignment(FVector2D(0.5f, 0.5f));
 		CardSlot->SetPosition(FVector2D(0.0f, 0.0f));
-		CardSlot->SetSize(FVector2D(460.0f, 0.0f));
 		CardSlot->SetAutoSize(true);
 
 		UVerticalBox* CardVBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("CardVBox"));
@@ -97,6 +101,9 @@ TSharedRef<SWidget> URailPauseMenuWidget::RebuildWidget()
 		// Кнопки действий
 		UButton* ResumeBtn = CreateMenuButton(TEXT("Продолжить проектирование"), FLinearColor(0.0f, 0.45f, 0.75f, 0.9f));
 		if (ResumeBtn) ResumeBtn->OnClicked.AddDynamic(this, &URailPauseMenuWidget::HandleResume);
+
+		UButton* SettingsBtn = CreateMenuButton(TEXT("⚙ Настройки графики и качества"), FLinearColor(0.18f, 0.32f, 0.58f, 0.9f));
+		if (SettingsBtn) SettingsBtn->OnClicked.AddDynamic(this, &URailPauseMenuWidget::HandleGraphicsSettings);
 
 		UButton* SaveBtn = CreateMenuButton(TEXT("Сохранить проект"), FLinearColor(0.05f, 0.5f, 0.35f, 0.9f));
 		if (SaveBtn) SaveBtn->OnClicked.AddDynamic(this, &URailPauseMenuWidget::HandleSave);
@@ -206,6 +213,11 @@ void URailPauseMenuWidget::HandleResume()
 {
 	SetVisibility(ESlateVisibility::Collapsed);
 	OnResumeClicked.Broadcast();
+}
+
+void URailPauseMenuWidget::HandleGraphicsSettings()
+{
+	OnGraphicsSettingsClicked.Broadcast();
 }
 
 void URailPauseMenuWidget::HandleSave()

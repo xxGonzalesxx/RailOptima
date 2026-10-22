@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Николайчик А.В. Все права защищены.
+﻿// Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Дипломный проект
 // «Разработка программы проектирования железнодорожных путей: модуль визуализации»,
 // ПривГУПС, 2026.
@@ -277,20 +277,13 @@ bool ARailOptimaPlayerController::TraceTerrainUnderCursor(FVector& OutHitLocatio
 	const bool bHit = GetWorld()->LineTraceSingleByObjectType(
 		Hit, WorldOrigin, End, ObjParams, QueryParams);
 
-	if (const_cast<ARailOptimaPlayerController*>(this)->TraceFrameCounter % 15 == 0)
+	// Диагностический лог переведен в Verbose, чтобы не вызывать спама в консоль и на диск при движении
+	if (const_cast<ARailOptimaPlayerController*>(this)->TraceFrameCounter % 60 == 0)
 	{
-		if (bHit)
-		{
-			UE_LOG(LogTemp, Log,
-				TEXT("[RailPC] Трейс рельефа: HIT, actor='%s', impact=(%.0f, %.0f, %.0f)."),
-				*GetNameSafe(Hit.GetActor()),
-				Hit.ImpactPoint.X, Hit.ImpactPoint.Y, Hit.ImpactPoint.Z);
-		}
-		else
-		{
-			UE_LOG(LogTemp, Warning,
-				TEXT("[RailPC] Трейс рельефа: MISS. Проверь complex collision у ProceduralTerrain."));
-		}
+		UE_LOG(LogTemp, Verbose,
+			TEXT("[RailPC] Трейс рельефа: %s, actor='%s'"),
+			bHit ? TEXT("HIT") : TEXT("MISS"),
+			*GetNameSafe(Hit.GetActor()));
 	}
 
 	if (!bHit)

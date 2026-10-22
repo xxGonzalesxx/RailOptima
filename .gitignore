@@ -63,6 +63,8 @@ $RECYCLE.BIN/
 # через обычный git. При необходимости — через Git LFS.
 /RawContent/
 /Content/RawContent/
+/Projects/*
+!Projects/.gitkeep
 
 # Кэш PBF в скриптах
 /Scripts/cache/

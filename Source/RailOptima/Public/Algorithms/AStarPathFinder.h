@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Николайчик А.В. Все права защищены.
+﻿// Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Дипломный проект
 // «Разработка программы проектирования железнодорожных путей: модуль визуализации»,
 // ПривГУПС, 2026.
@@ -131,6 +131,14 @@ private:
 	TObjectPtr<UCostCalculator> CostCalculator;
 
 	FRailCategoryNorms CurrentNorms;
+
+	// Кэшированные буферы для исключения повторных аллокаций памяти при частом поиске пути
+	TArray<float> CachedGScore;
+	TArray<float> CachedFScore;
+	TArray<int32> CachedCameFrom;
+	TArray<int8>  CachedNodeState;
+	TArray<int32> CachedOpenHeap;
+	TArray<int32> CachedHeapPositions;
 
 	static constexpr int32 NumDirections = 8;
 	static const int32	   DirectionX[NumDirections];

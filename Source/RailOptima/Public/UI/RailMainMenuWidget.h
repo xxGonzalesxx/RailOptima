@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Николайчик А.В. Все права защищены.
+﻿// Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Главное меню и дашборд проектов RailOptima
 
 #pragma once
@@ -21,6 +21,7 @@ class UVerticalBox;
 class URailMainMenuWidget;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnRailProjectSelectedSignature, const FRailProjectMetadata&, ProjectMeta);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnRailGraphicsSettingsRequestedSignature);
 
 UCLASS()
 class RAILOPTIMA_API URailProjectActionHelper : public UObject
@@ -72,6 +73,9 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "RailOptima|Events")
 	FOnRailProjectSelectedSignature OnProjectOpened;
 
+	UPROPERTY(BlueprintAssignable, Category = "RailOptima|Events")
+	FOnRailGraphicsSettingsRequestedSignature OnGraphicsSettingsRequested;
+
 private:
 	// Построение подсекций UI
 	void BuildHeader(UVerticalBox* MainVBox);
@@ -93,6 +97,9 @@ private:
 	UFUNCTION()
 	void HandleRefreshLibraryClicked();
 
+	UFUNCTION()
+	void HandleGraphicsSettingsClicked();
+
 	// Обработчики модального окна создания проекта
 	UFUNCTION()
 	void HandleBrowseFileClicked();
@@ -108,6 +115,9 @@ private:
 
 	UFUNCTION()
 	void HandleSourceTypeToggledTif();
+
+	UFUNCTION()
+	UWidget* HandleGenerateCategoryWidget(FString Item);
 
 	// Обработчики окна авторизации
 	UFUNCTION()

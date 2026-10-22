@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Николайчик А.В. Все права защищены.
+﻿// Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Дипломный проект
 // «Разработка программы проектирования железнодорожных путей: модуль визуализации»,
 // ПривГУПС, 2026.
@@ -21,6 +21,8 @@
 #include "TimerManager.h"
 #include "UI/RailMainMenuWidget.h"
 #include "UI/RailPauseMenuWidget.h"
+#include "UI/RailGraphicsSettingsWidget.h"
+#include "Services/RailSettingsManager.h"
 #include "UI/RailToastWidget.h"
 #include "Visualization/PathRenderer.h"
 #include "Visualization/RailCostSummaryWidget.h"
@@ -56,7 +58,9 @@ void ARailOptimaGameMode::BeginPlay()
 		CostSummaryWidget->SetVisibility(ESlateVisibility::Collapsed);
 	}
 
+	URailSettingsManager::InitializeSettings(/*bForceBenchmark=*/false);
 	SetupGlobalToastWidget();
+	SetupGraphicsSettingsWidget();
 	SetupPauseMenuWidget();
 	SetupMainMenuWidget();
 }
@@ -112,6 +116,7 @@ void ARailOptimaGameMode::SetupMainMenuWidget()
 	{
 		MainMenuWidget->AddToViewport(50);
 		MainMenuWidget->OnProjectOpened.AddDynamic(this, &ARailOptimaGameMode::HandleProjectOpenedFromMenu);
+		MainMenuWidget->OnGraphicsSettingsRequested.AddDynamic(this, &ARailOptimaGameMode::ShowGraphicsSettings);
 	}
 }
 
@@ -131,6 +136,7 @@ void ARailOptimaGameMode::SetupPauseMenuWidget()
 		PauseMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
 
 		PauseMenuWidget->OnResumeClicked.AddDynamic(this, &ARailOptimaGameMode::HandlePauseResume);
+		PauseMenuWidget->OnGraphicsSettingsClicked.AddDynamic(this, &ARailOptimaGameMode::ShowGraphicsSettings);
 		PauseMenuWidget->OnSaveProjectClicked.AddDynamic(this, &ARailOptimaGameMode::HandlePauseSave);
 		PauseMenuWidget->OnExportExcelClicked.AddDynamic(this, &ARailOptimaGameMode::HandlePauseExportExcel);
 		PauseMenuWidget->OnReturnToMainMenuClicked.AddDynamic(this, &ARailOptimaGameMode::HandlePauseReturnToMenu);
@@ -1097,4 +1103,38 @@ void ARailOptimaGameMode::HandleEndpointMoved(ARailEndpoint* /*Endpoint*/)
 void ARailOptimaGameMode::HandleDeferredRecompute()
 {
 	RecomputePath();
+}
+void ARailOptimaGameMode::SetupGraphicsSettingsWidget()
+{
+	if (GraphicsSettingsWidget)
+		return;
+
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PC)
+		return;
+
+	GraphicsSettingsWidget = CreateWidget<URailGraphicsSettingsWidget>(PC, URailGraphicsSettingsWidget::StaticClass());
+	if (GraphicsSettingsWidget)
+	{
+		GraphicsSettingsWidget->AddToViewport(120);
+		GraphicsSettingsWidget->SetVisibility(ESlateVisibility::Collapsed);
+		GraphicsSettingsWidget->OnSettingsApplied.AddDynamic(this, &ARailOptimaGameMode::HandleGraphicsSettingsApplied);
+	}
+}
+
+void ARailOptimaGameMode::ShowGraphicsSettings()
+{
+	if (!GraphicsSettingsWidget)
+	{
+		SetupGraphicsSettingsWidget();
+	}
+	if (GraphicsSettingsWidget)
+	{
+		GraphicsSettingsWidget->OpenSettingsModal();
+	}
+}
+
+void ARailOptimaGameMode::HandleGraphicsSettingsApplied()
+{
+	ShowToast(TEXT("Настройки графики успешно применены и сохранены"), ERailToastType::Success, 3.5f);
 }

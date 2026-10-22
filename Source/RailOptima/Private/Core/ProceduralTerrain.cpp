@@ -1,4 +1,4 @@
-// Copyright (c) 2026 Николайчик А.В. Все права защищены.
+﻿// Copyright (c) 2026 Николайчик А.В. Все права защищены.
 // Дипломный проект
 // «Разработка программы проектирования железнодорожных путей: модуль
 // визуализации», ПривГУПС, 2026.
@@ -24,7 +24,7 @@ AProceduralTerrain::AProceduralTerrain()
 		CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("TerrainMesh"));
 	RootComponent = TerrainMesh;
 
-	TerrainMesh->bUseAsyncCooking = false;
+	TerrainMesh->bUseAsyncCooking = true;
 	TerrainMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	TerrainMesh->bUseComplexAsSimpleCollision = true;
 	TerrainMesh->SetCollisionObjectType(ECC_WorldStatic);
@@ -100,12 +100,15 @@ bool AProceduralTerrain::BuildFromHeightmap(const FString& InHeightMapPath)
 
 	TArray<FVector2D> UVs;
 	UVs.SetNumUninitialized(Vertices.Num());
-	for (int32 i = 0; i < UVs.Num(); ++i)
+	const float InvRes = 1.0f / static_cast<float>(FMath::Max(Resolution - 1, 1));
+	for (int32 Y = 0; Y < Resolution; ++Y)
 	{
-		UVs[i] = FVector2D(static_cast<float>(i % Resolution) /
-				static_cast<float>(Resolution - 1),
-			static_cast<float>(i / Resolution) /
-				static_cast<float>(Resolution - 1));
+		const float V = Y * InvRes;
+		const int32 RowOffset = Y * Resolution;
+		for (int32 X = 0; X < Resolution; ++X)
+		{
+			UVs[RowOffset + X] = FVector2D(X * InvRes, V);
+		}
 	}
 
 	TArray<FProcMeshTangent> Tangents;
@@ -331,15 +334,16 @@ void AProceduralTerrain::BuildMeshData(const FRailHeightMapData& InHeightMap,
 	TArray<FVector>&											 OutNormals) const
 {
 	const int32 NumVertices = InResolution * InResolution;
+	const int32 NumTriangles = (InResolution - 1) * (InResolution - 1) * 6;
 	const float StepSize = TerrainParameters.StepSize_m;
 	const float ZScale = TerrainParameters.ZScale;
 	const float ElevRange =
 		FMath::Max(InHeightMap.MaxElevation_m - InHeightMap.MinElevation_m, 1.0f);
 
-	OutVertices.Reserve(NumVertices);
-	OutColors.Reserve(NumVertices);
-	OutNormals.Reserve(NumVertices);
-	OutTriangles.Reserve((InResolution - 1) * (InResolution - 1) * 6);
+	OutVertices.SetNumUninitialized(NumVertices);
+	OutColors.SetNumUninitialized(NumVertices);
+	OutNormals.SetNumZeroed(NumVertices);
+	OutTriangles.SetNumUninitialized(NumTriangles);
 
 	const float ScaleX = static_cast<float>(InHeightMap.Width - 1) /
 		FMath::Max(InResolution - 1, 1);
@@ -348,25 +352,26 @@ void AProceduralTerrain::BuildMeshData(const FRailHeightMapData& InHeightMap,
 
 	for (int32 Y = 0; Y < InResolution; ++Y)
 	{
+		const int32 RowOffset = Y * InResolution;
+		const float SrcY = Y * ScaleY;
+		const int32 Y0 = FMath::Clamp(FMath::FloorToInt(SrcY), 0, InHeightMap.Height - 1);
+		const int32 Y1 = FMath::Clamp(Y0 + 1, 0, InHeightMap.Height - 1);
+		const float FracY = SrcY - Y0;
+
+		const int32 MapRow0 = Y0 * InHeightMap.Width;
+		const int32 MapRow1 = Y1 * InHeightMap.Width;
+
 		for (int32 X = 0; X < InResolution; ++X)
 		{
 			const float SrcX = X * ScaleX;
-			const float SrcY = Y * ScaleY;
-
-			const int32 X0 =
-				FMath::Clamp(FMath::FloorToInt(SrcX), 0, InHeightMap.Width - 1);
-			const int32 Y0 =
-				FMath::Clamp(FMath::FloorToInt(SrcY), 0, InHeightMap.Height - 1);
+			const int32 X0 = FMath::Clamp(FMath::FloorToInt(SrcX), 0, InHeightMap.Width - 1);
 			const int32 X1 = FMath::Clamp(X0 + 1, 0, InHeightMap.Width - 1);
-			const int32 Y1 = FMath::Clamp(Y0 + 1, 0, InHeightMap.Height - 1);
-
 			const float FracX = SrcX - X0;
-			const float FracY = SrcY - Y0;
 
-			const float H00 = InHeightMap.Heights[Y0 * InHeightMap.Width + X0];
-			const float H10 = InHeightMap.Heights[Y0 * InHeightMap.Width + X1];
-			const float H01 = InHeightMap.Heights[Y1 * InHeightMap.Width + X0];
-			const float H11 = InHeightMap.Heights[Y1 * InHeightMap.Width + X1];
+			const float H00 = InHeightMap.Heights[MapRow0 + X0];
+			const float H10 = InHeightMap.Heights[MapRow0 + X1];
+			const float H01 = InHeightMap.Heights[MapRow1 + X0];
+			const float H11 = InHeightMap.Heights[MapRow1 + X1];
 
 			const float H0 = FMath::Lerp(H00, H10, FracX);
 			const float H1 = FMath::Lerp(H01, H11, FracX);
@@ -376,13 +381,13 @@ void AProceduralTerrain::BuildMeshData(const FRailHeightMapData& InHeightMap,
 				InHeightMap.MinElevation_m + NormHeight * ElevRange;
 			const float Z_cm = Height_m * 100.0f * ZScale;
 
-			OutVertices.Add(
-				FVector(X * StepSize * 100.0f, Y * StepSize * 100.0f, Z_cm));
-			OutColors.Add(GetColorByHeight(NormHeight));
-			OutNormals.Add(FVector::UpVector);
+			const int32 Idx = RowOffset + X;
+			OutVertices[Idx] = FVector(X * StepSize * 100.0f, Y * StepSize * 100.0f, Z_cm);
+			OutColors[Idx] = GetColorByHeight(NormHeight);
 		}
 	}
 
+	int32 TriIdx = 0;
 	for (int32 Y = 0; Y < InResolution - 1; ++Y)
 	{
 		for (int32 X = 0; X < InResolution - 1; ++X)
@@ -392,39 +397,33 @@ void AProceduralTerrain::BuildMeshData(const FRailHeightMapData& InHeightMap,
 			const int32 I2 = I0 + InResolution;
 			const int32 I3 = I2 + 1;
 
-			OutTriangles.Add(I0);
-			OutTriangles.Add(I2);
-			OutTriangles.Add(I1);
+			OutTriangles[TriIdx++] = I0;
+			OutTriangles[TriIdx++] = I2;
+			OutTriangles[TriIdx++] = I1;
 
-			OutTriangles.Add(I1);
-			OutTriangles.Add(I2);
-			OutTriangles.Add(I3);
+			OutTriangles[TriIdx++] = I1;
+			OutTriangles[TriIdx++] = I2;
+			OutTriangles[TriIdx++] = I3;
 		}
 	}
 
-	for (int32 i = 0; i < OutNormals.Num(); ++i)
-	{
-		OutNormals[i] = FVector::ZeroVector;
-	}
-
-	for (int32 t = 0; t < OutTriangles.Num(); t += 3)
+	for (int32 t = 0; t < NumTriangles; t += 3)
 	{
 		const int32 A = OutTriangles[t];
 		const int32 B = OutTriangles[t + 1];
 		const int32 C = OutTriangles[t + 2];
 
-		const FVector Normal =
-			FVector::CrossProduct(OutVertices[B] - OutVertices[A],
-				OutVertices[C] - OutVertices[A])
-				.GetSafeNormal();
+		const FVector FaceCross = FVector::CrossProduct(
+			OutVertices[B] - OutVertices[A],
+			OutVertices[C] - OutVertices[A]);
 
-		OutNormals[A] += Normal;
-		OutNormals[B] += Normal;
-		OutNormals[C] += Normal;
+		OutNormals[A] += FaceCross;
+		OutNormals[B] += FaceCross;
+		OutNormals[C] += FaceCross;
 	}
 
-	for (FVector& N : OutNormals)
+	for (int32 i = 0; i < NumVertices; ++i)
 	{
-		N = N.GetSafeNormal();
+		OutNormals[i] = OutNormals[i].GetSafeNormal(1.e-4f, FVector::UpVector);
 	}
 }
