@@ -90,11 +90,14 @@ void UExcelExporter::WriteSummarySheet(const FRailRouteReport& InReport, lxw_wor
 	worksheet_write_string(InSheet, 3, 0, "Общая длина, м", ValueFormat);
 	worksheet_write_number(InSheet, 3, 1, InReport.TotalLength_m, ValueFormat);
 
-	worksheet_write_string(InSheet, 4, 0, "Общая стоимость, руб.", ValueFormat);
+	worksheet_write_string(InSheet, 4, 0, "Общая стоимость, тыс. руб.", ValueFormat);
 	worksheet_write_number(InSheet, 4, 1, InReport.TotalCost, ValueFormat);
 
-	worksheet_write_string(InSheet, 5, 0, "Количество участков", ValueFormat);
-	worksheet_write_number(InSheet, 5, 1, InReport.Segments.Num(), ValueFormat);
+	worksheet_write_string(InSheet, 5, 0, "Общая стоимость, млн руб.", ValueFormat);
+	worksheet_write_number(InSheet, 5, 1, InReport.TotalCost / 1000.0, ValueFormat);
+
+	worksheet_write_string(InSheet, 6, 0, "Количество участков", ValueFormat);
+	worksheet_write_number(InSheet, 6, 1, InReport.Segments.Num(), ValueFormat);
 }
 
 void UExcelExporter::WriteSegmentsSheet(const FRailRouteReport& InReport, lxw_workbook* InWorkbook, lxw_worksheet* InSheet)
@@ -123,7 +126,7 @@ void UExcelExporter::WriteSegmentsSheet(const FRailRouteReport& InReport, lxw_wo
 	worksheet_write_string(InSheet, 0, 3, "Длина, м", HeaderFormat);
 	worksheet_write_string(InSheet, 0, 4, "Уклон", HeaderFormat);
 	worksheet_write_string(InSheet, 0, 5, "Коэф. грунта", HeaderFormat);
-	worksheet_write_string(InSheet, 0, 6, "Стоимость, руб.", HeaderFormat);
+	worksheet_write_string(InSheet, 0, 6, "Стоимость, тыс. руб.", HeaderFormat);
 
 	for (int32 i = 0; i < InReport.Segments.Num(); ++i)
 	{

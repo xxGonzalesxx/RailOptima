@@ -26,7 +26,7 @@ double UCostCalculator::GetBaseCostPerKmBySlope_kRub(float InSlopePermille)
 	}
 	if (AbsSlope <= 25.0f)
 	{
-		return 580611.0; // III (холмистый): 580 611 – 632 593 тыс. руб.
+		return 606602.0; // III (холмистый): среднее между 580 611 и 632 593 тыс. руб.
 	}
 	return 780948.5; // IV (горный): 728 609 – 833 288 тыс. руб.
 }
@@ -127,7 +127,12 @@ float UCostCalculator::CalculateEdgeCost(
 
 	const double BaseCost_kRub = GetBaseCostPerKmBySlope_kRub(SlopePermille);
 	const double SlopeMult = GetSlopeMultiplier(SlopePermille) * (1.0 + FMath::Abs(InSlopePercent) * Parameters.SlopePenalty * 0.1);
-	const double CurveMult = GetCurveMultiplier(EstimatedRadius_m) * (1.0 + Parameters.TurnPenalty * FMath::Square(InTurnAngleDeg / 90.0f));
+	double AnglePenalty = Parameters.TurnPenalty * FMath::Square(InTurnAngleDeg / 90.0f);
+	if (InTurnAngleDeg > 46.0f)
+	{
+		AnglePenalty *= 3.0; // Прогрессивный штраф за излом > 45 градусов стимулирует выбор плавных коридоров
+	}
+	const double CurveMult = GetCurveMultiplier(EstimatedRadius_m) * (1.0 + AnglePenalty);
 	const double Surcharge_kRub = GetSlopeSurchargePerKm_kRub(SlopePermille);
 
 	const double RatePerKm_kRub = (BaseCost_kRub * InGroundCoefficient * SlopeMult * CurveMult) + Surcharge_kRub;

@@ -114,7 +114,13 @@ struct FRailCategoryNorms
 			}
 		}
 
-		return 180.0f;
+		return 0.0f; // Не помещается ни один стандартный радиус (даже 180 м)
+	}
+
+	// Требуется ли технико-экономическое обоснование (ТЭО) и ограничение скорости (R < 300 м)
+	static bool RequiresTEO(float InRadius_m)
+	{
+		return InRadius_m > 0.0f && InRadius_m < 300.0f;
 	}
 
 	// Расчёт тангенса вертикальной кривой: Tv = (Rv * Δi) / 2000

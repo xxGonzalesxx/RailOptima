@@ -97,9 +97,7 @@ void ARailEndpoint::SetEndpointFromTerrainHit(
 {
 	const FVector OldLocation = GetActorLocation();
 
-	const float NewZ = (FMath::Abs(InTerrainHitLocation.Z) > KINDA_SMALL_NUMBER)
-		? (InTerrainHitLocation.Z + TerrainZOffset_cm)
-		: OldLocation.Z;
+	const float NewZ = InTerrainHitLocation.Z + TerrainZOffset_cm;
 
 	const FVector NewLocation(InTerrainHitLocation.X, InTerrainHitLocation.Y,
 		NewZ);

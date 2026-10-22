@@ -19,6 +19,12 @@ struct FRailPathViolation
 
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Validation")
 	int32 NodeIndex = -1;
+
+	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Validation")
+	bool bIsWarning = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Validation")
+	bool bRequiresTEO = false;
 };
 
 USTRUCT(BlueprintType)
@@ -39,7 +45,14 @@ class RAILOPTIMA_API URailPathValidator : public UObject
 	GENERATED_BODY()
 
 public:
-	// Полная проверка пути по нормативам
+	// Инженерная проверка готовой трассы в мировых координатах (СП 119.13330)
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Validation")
+	FRailValidationResult ValidateWorldTrack(
+		const TArray<FVector>&	  InWorldPoints_cm,
+		const FRailCategoryNorms& InNorms,
+		float					  InWorldZScale = 1.0f) const;
+
+	// Полная проверка пути по нормативам на сетке A*
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Validation")
 	FRailValidationResult ValidatePath(
 		const FRailGridData&	  InGrid,

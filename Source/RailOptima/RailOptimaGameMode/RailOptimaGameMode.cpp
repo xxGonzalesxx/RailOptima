@@ -303,13 +303,14 @@ void ARailOptimaGameMode::RecomputePath()
 	float			MaxSlopePermille = 0.0f;
 	TArray<FVector> SmoothPoints = GenerateRailwayArcs(CachedGrid, Result, Norms, MinPlanRadius_m, MaxSlopePermille);
 
-	// 4. Валидация по СП 119.13330
-	if (PathValidator)
+	// 4. Валидация по СП 119.13330 (проверка построенной 3D трассы)
+	if (PathValidator && SmoothPoints.Num() > 1)
 	{
-		const FRailValidationResult ValRes = PathValidator->ValidatePath(CachedGrid, Result, Norms);
+		const float ZScaleVal = (PathRenderer && PathRenderer->WorldZScale > 0.0f) ? PathRenderer->WorldZScale : 1.0f;
+		const FRailValidationResult ValRes = PathValidator->ValidateWorldTrack(SmoothPoints, Norms, ZScaleVal);
 		if (!ValRes.bIsValid && ValRes.Violations.Num() > 0)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("[RailGM] Обнаружено отступлений от норм (требуется ТЭО/ИССО): %d. Пример: %s"),
+			UE_LOG(LogTemp, Warning, TEXT("[RailGM] Отступления от СП 119.13330 (требуется ТЭО/ИССО): %d. Пример: %s"),
 				ValRes.Violations.Num(), *ValRes.Violations[0].Message);
 		}
 	}
@@ -474,50 +475,54 @@ TArray<FVector> ARailOptimaGameMode::GenerateRailwayArcs(
 
 			// Выбираем радиус из стандартного ряда СП 119.13330 (4000, 3000, 2500 ... 180 м)
 			const float SelectedStandardRadius_m = InNorms.PickStandardRadius(MaxFittingRadius_m);
-			const float R_cm = FMath::Min(SelectedStandardRadius_m, MaxFittingRadius_m) * 100.0f;
-			const float T_cm = R_cm * HalfTurnTan;
 
-			if (R_cm >= 15000.0f && T_cm <= MaxTangent_cm + 1.0f) // от 150 м и выше
+			if (SelectedStandardRadius_m > 0.0f && SelectedStandardRadius_m <= MaxFittingRadius_m)
 			{
-				BestMinRadius_m = FMath::Min(BestMinRadius_m, R_cm * 0.01f);
+				const float R_cm = SelectedStandardRadius_m * 100.0f;
+				const float T_cm = R_cm * HalfTurnTan;
 
-				if (SelectedStandardRadius_m < 300.0f)
+				if (T_cm <= MaxTangent_cm + 1.0f)
 				{
-					UE_LOG(LogTemp, Warning,
-						TEXT("[ArcGen] Малый радиус R=%.0f м (< 300 м): по СП 119.13330 требуется ТЭО и ограничение скорости!"),
-						SelectedStandardRadius_m);
+					BestMinRadius_m = FMath::Min(BestMinRadius_m, SelectedStandardRadius_m);
+
+					if (SelectedStandardRadius_m < 300.0f)
+					{
+						UE_LOG(LogTemp, Warning,
+							TEXT("[ArcGen] Малый радиус R=%.0f м (< 300 м): по СП 119.13330 требуется ТЭО и ограничение скорости!"),
+							SelectedStandardRadius_m);
+					}
+
+					const FVector2D T1 = PCurr - V1 * T_cm;
+					const FVector2D T2 = PCurr + V2 * T_cm;
+
+					if (FVector2D::Distance(Final2D.Last(), T1) > 10.0f)
+					{
+						Final2D.Add(T1);
+					}
+
+					// Находим центр дуги через нормаль в сторону поворота
+					const float		CrossZ = V1.X * V2.Y - V1.Y * V2.X;
+					const float		Sign = (CrossZ >= 0.0f) ? 1.0f : -1.0f;
+					const FVector2D PerpV1(-V1.Y * Sign, V1.X * Sign);
+					const FVector2D Center = T1 + PerpV1 * R_cm;
+
+					const float StartAngle = FMath::Atan2(T1.Y - Center.Y, T1.X - Center.X);
+					const float EndAngle = FMath::Atan2(T2.Y - Center.Y, T2.X - Center.X);
+					float		DeltaAngle = EndAngle - StartAngle;
+
+					while (DeltaAngle > PI)
+						DeltaAngle -= 2.0f * PI;
+					while (DeltaAngle < -PI)
+						DeltaAngle += 2.0f * PI;
+
+					const int32 NumSteps = FMath::Clamp(FMath::CeilToInt(FMath::Abs(DeltaAngle) * R_cm / 2000.0f), 6, 48);
+					for (int32 s = 1; s <= NumSteps; ++s)
+					{
+						const float a = StartAngle + DeltaAngle * (static_cast<float>(s) / static_cast<float>(NumSteps));
+						Final2D.Add(Center + FVector2D(FMath::Cos(a), FMath::Sin(a)) * R_cm);
+					}
+					bArcAdded = true;
 				}
-
-				const FVector2D T1 = PCurr - V1 * T_cm;
-				const FVector2D T2 = PCurr + V2 * T_cm;
-
-				if (FVector2D::Distance(Final2D.Last(), T1) > 10.0f)
-				{
-					Final2D.Add(T1);
-				}
-
-				// Находим центр дуги через нормаль в сторону поворота
-				const float		CrossZ = V1.X * V2.Y - V1.Y * V2.X;
-				const float		Sign = (CrossZ >= 0.0f) ? 1.0f : -1.0f;
-				const FVector2D PerpV1(-V1.Y * Sign, V1.X * Sign);
-				const FVector2D Center = T1 + PerpV1 * R_cm;
-
-				const float StartAngle = FMath::Atan2(T1.Y - Center.Y, T1.X - Center.X);
-				const float EndAngle = FMath::Atan2(T2.Y - Center.Y, T2.X - Center.X);
-				float		DeltaAngle = EndAngle - StartAngle;
-
-				while (DeltaAngle > PI)
-					DeltaAngle -= 2.0f * PI;
-				while (DeltaAngle < -PI)
-					DeltaAngle += 2.0f * PI;
-
-				const int32 NumSteps = FMath::Clamp(FMath::CeilToInt(FMath::Abs(DeltaAngle) * R_cm / 2000.0f), 6, 48);
-				for (int32 s = 1; s <= NumSteps; ++s)
-				{
-					const float a = StartAngle + DeltaAngle * (static_cast<float>(s) / static_cast<float>(NumSteps));
-					Final2D.Add(Center + FVector2D(FMath::Cos(a), FMath::Sin(a)) * R_cm);
-				}
-				bArcAdded = true;
 			}
 		}
 

@@ -85,7 +85,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "RailOptima|Terrain")
 	float GetMapSizeMeters() const
 	{
-		return TerrainParameters.MeshResolution * TerrainParameters.StepSize_m;
+		const int32 Segments = FMath::Max(TerrainParameters.MeshResolution - 1, 1);
+		return Segments * TerrainParameters.StepSize_m;
 	}
 
 	// Меш ландшафта — нужен ARoadRenderer для трейсов и посадки дорог.

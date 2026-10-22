@@ -162,8 +162,9 @@ bool AProceduralTerrain::SampleTerrainZ_cm(const FVector2D& InWorldXY,
 	if (MeshVertexHeightsZ_cm.Num() != Res * Res)
 		return false;
 
-	const float FX = InWorldXY.X / Step_cm;
-	const float FY = InWorldXY.Y / Step_cm;
+	const FVector ActorLoc = GetActorLocation();
+	const float FX = (InWorldXY.X - ActorLoc.X) / Step_cm;
+	const float FY = (InWorldXY.Y - ActorLoc.Y) / Step_cm;
 
 	// Расширяем допуск до Res - 1 + 0.5f, чтобы точки на границе меша не давали
 	// miss.

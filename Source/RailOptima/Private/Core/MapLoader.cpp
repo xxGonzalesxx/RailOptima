@@ -63,32 +63,13 @@ bool UMapLoader::DecodeImage(const TArray<uint8>& InRawBytes, FRailHeightMapData
 
 	OutData.Heights.SetNumUninitialized(TotalPixels);
 
-	// Поиск минимального и максимального значения для нормализации 16-бит (0..65535)
-	uint16 MinVal = MAX_uint16;
-	uint16 MaxVal = 0;
-
-	for (int32 i = 0; i < TotalPixels; ++i)
-	{
-		uint16 Val = PixelPtr[i];
-		if (Val < MinVal)
-			MinVal = Val;
-		if (Val > MaxVal)
-			MaxVal = Val;
-	}
-
-	const float Range = static_cast<float>(MaxVal - MinVal);
-
 	// Заполняем нормализованный массив высот [0..1]
+	// Исходный 16-битный PNG от gdal_translate уже отмасштабирован в диапазон 0..65535
+	// пропорционально [MinElevation_m..MaxElevation_m]. Прямая нормализация сохраняет
+	// абсолютную привязку высот без локальных искажений.
 	for (int32 i = 0; i < TotalPixels; ++i)
 	{
-		if (Range > 0.0f)
-		{
-			OutData.Heights[i] = static_cast<float>(PixelPtr[i] - MinVal) / Range;
-		}
-		else
-		{
-			OutData.Heights[i] = 0.0f;
-		}
+		OutData.Heights[i] = static_cast<float>(PixelPtr[i]) / 65535.0f;
 	}
 
 	// Примерные метаданные высот в метрах (можно переопределить позже привязкой)

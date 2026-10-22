@@ -397,11 +397,13 @@ float UAStarPathFinder::EvaluateEdge(
 		}
 	}
 
-	// ЖЕСТКОЕ ОГРАНИЧЕНИЕ: поезда не могут поворачивать более чем на 45 градусов
-	// за один шаг сетки (90 градусов, 135 и 180 — это излом)
-	if (TurnAngleDeg > 46.0f)
+	// Жесткий запрет: поезда не могут разворачиваться назад или делать острый излом (>90 градусов).
+	// Углы до 45 градусов — штатные для дискретной 8-связной сетки.
+	// Углы от 46 до 90 градусов допускаются с прогрессивным штрафом в CostCalculator,
+	// после чего трасса сглаживается дугами нормативных радиусов по СП 119.13330.
+	if (TurnAngleDeg > 91.0f)
 	{
-		return -1.0f; // Сигнализируем о невозможности маневра
+		return -1.0f; // Разворот назад или острый излом невозможен
 	}
 
 	const float GroundCoef = CostCalculator->GetGroundCoefficient(ToNode.GroundType);
@@ -427,9 +429,9 @@ float UAStarPathFinder::Heuristic(
 
 	const float MinCoefficient = CostCalculator ? CostCalculator->GetMinGroundCoefficient() : 0.9f;
 
-	// Берем минимальную стоимость 1 км (для идеальной равнины) из калькулятора,
+	// Берем минимальную стоимость 1 км (для идеальной равнины) по НЦС 81-02-07-2025,
 	// чтобы эвристика была в тех же величинах (тыс. руб.), что и стоимость пути
-	const float MinBaseCostPerKm_kRub = 313000.0f;
+	const float MinBaseCostPerKm_kRub = 313075.0f;
 
 	return Distance_km * MinBaseCostPerKm_kRub * MinCoefficient;
 }
