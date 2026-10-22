@@ -1,6 +1,7 @@
 package api.project.service;
 
 import api.auth.repository.UserRepository;
+import api.common.dto.PageResponse;
 import api.common.exception.ForbiddenException;
 import api.common.exception.ResourceNotFoundException;
 import api.project.dto.ProjectCreateRequest;
@@ -9,48 +10,62 @@ import api.project.dto.ProjectUpdateRequest;
 import api.project.model.Project;
 import api.project.model.ProjectStatus;
 import api.project.repository.ProjectRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import io.quarkus.panache.common.Page;
+import io.quarkus.panache.common.Sort;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import org.jboss.logging.Logger;
 
+import java.util.List;
 import java.util.UUID;
 
-@Service
-@RequiredArgsConstructor
-@Slf4j
+@ApplicationScoped
 public class ProjectService {
 
-    private final ProjectRepository projectRepository;
-    private final UserRepository userRepository;
+    private static final Logger log = Logger.getLogger(ProjectService.class);
+
+    @Inject
+    ProjectRepository projectRepository;
+
+    @Inject
+    UserRepository userRepository;
 
     @Transactional
     public ProjectResponse createProject(ProjectCreateRequest request, String userEmail) {
         UUID ownerId = resolveUserId(userEmail);
 
-        Project project = Project.builder()
-                .name(request.name())
-                .description(request.description())
-                .status(ProjectStatus.CREATED)
-                .ownerId(ownerId)
-                .build();
+        Project project = new Project();
+        project.setName(request.name());
+        project.setDescription(request.description());
+        project.setStatus(ProjectStatus.CREATED);
+        project.setOwnerId(ownerId);
 
-        Project saved = projectRepository.saveAndFlush(project);  // ← flush сразу
-        log.info("Project '{}' created by user {}", saved.getName(), ownerId);
+        projectRepository.persist(project);
+        log.infof("Project '%s' created by user %s", project.getName(), ownerId);
 
-        return toResponse(saved);
+        return toResponse(project);
     }
 
-    @Transactional(readOnly = true)
-    public Page<ProjectResponse> getMyProjects(String userEmail, Pageable pageable) {
+    @Transactional
+    public PageResponse<ProjectResponse> getMyProjects(String userEmail, int pageIndex, int pageSize) {
         UUID ownerId = resolveUserId(userEmail);
-        return projectRepository.findAllByOwnerId(ownerId, pageable)
-                .map(this::toResponse);
+
+        // PanacheQuery для выборки с пагинацией
+        var query = projectRepository.find("ownerId", Sort.by("createdAt").descending(), ownerId);
+
+        query.page(Page.of(pageIndex, pageSize));
+
+        List<ProjectResponse> content = query.list().stream()
+                .map(this::toResponse)
+                .toList();
+
+        long totalElements = query.count();
+
+        return PageResponse.from(content, totalElements, pageIndex, pageSize);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ProjectResponse getProject(UUID projectId, String userEmail) {
         UUID currentUserId = resolveUserId(userEmail);
         Project project = findOwnedProject(projectId, currentUserId);
@@ -66,10 +81,12 @@ public class ProjectService {
         project.setDescription(request.description());
         project.setStatus(request.status());
 
-        Project updated = projectRepository.saveAndFlush(project);
-        log.info("Project {} updated by user {}", projectId, currentUserId);
+        // В Panache сущность обновляется автоматически, если она в контексте (managed).
+        // Явно вызывать save не нужно, но для надежности:
+        projectRepository.persist(project);
+        log.infof("Project %s updated by user %s", projectId, currentUserId);
 
-        return toResponse(updated);
+        return toResponse(project);
     }
 
     @Transactional
@@ -78,14 +95,16 @@ public class ProjectService {
         Project project = findOwnedProject(projectId, currentUserId);
 
         projectRepository.delete(project);
-        log.info("Project {} deleted by user {}", projectId, currentUserId);
+        log.infof("Project %s deleted by user %s", projectId, currentUserId);
     }
 
     // --- private helpers ---
 
     private Project findOwnedProject(UUID projectId, UUID currentUserId) {
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() -> new ResourceNotFoundException("Project", projectId));
+        Project project = projectRepository.findById(projectId);
+        if (project == null) {
+            throw new ResourceNotFoundException("Project", projectId);
+        }
 
         if (!project.getOwnerId().equals(currentUserId)) {
             throw new ForbiddenException("У вас нет доступа к этому проекту");

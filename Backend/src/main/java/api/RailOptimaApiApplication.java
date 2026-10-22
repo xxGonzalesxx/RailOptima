@@ -1,14 +1,12 @@
 package api;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
+import io.quarkus.runtime.Quarkus;
+import io.quarkus.runtime.annotations.QuarkusMain;
 
-@SpringBootApplication
-@ConfigurationPropertiesScan
+@QuarkusMain
 public class RailOptimaApiApplication {
      static void main(String[] args) {
-         SpringApplication.run(RailOptimaApiApplication.class, args);
+         Quarkus.run(args);
     }
 }
 

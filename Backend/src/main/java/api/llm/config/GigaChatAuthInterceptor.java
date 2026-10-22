@@ -1,15 +1,9 @@
 package api.llm.config;
 
+import io.netty.handler.codec.http.HttpRequest;
+import jakarta.ws.rs.core.MediaType;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.jspecify.annotations.NonNull;
-import org.springframework.http.HttpRequest;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.ClientHttpRequestExecution;
-import org.springframework.http.client.ClientHttpRequestInterceptor;
-import org.springframework.http.client.ClientHttpResponse;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestClient;
-
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
@@ -44,13 +38,12 @@ public class GigaChatAuthInterceptor implements ClientHttpRequestInterceptor {
 
     private synchronized void refreshAccessToken() {
         if (cachedAccessToken != null && System.currentTimeMillis() < tokenExpiryTime) {
-            return; // другой поток уже обновил, пока мы ждали на synchronized
+            return;
         }
         try {
             MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
             formData.add("scope", scope);
 
-            @SuppressWarnings("unchecked")
             Map<String, Object> response = authClient.post()
                     .uri("/oauth")
                     .header("Authorization", "Basic " + authKey)

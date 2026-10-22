@@ -1,10 +1,9 @@
 package api.llm.config;
 
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.web.client.RestClient;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.Produces;
+import lombok.Value;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -15,7 +14,7 @@ import java.net.HttpURLConnection;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 
-@Configuration
+@ApplicationScoped
 public class LlmConfig {
 
     // ВНИМАНИЕ: доверяем любому сертификату, потому что у Сбера/GigaChat
@@ -23,7 +22,7 @@ public class LlmConfig {
     // JVM-truststore. Правильное решение для прода — импортировать
     // российский корневой сертификат Минцифры в truststore и убрать этот
     // trust-all TrustManager. Для разработки — оставляем как есть.
-    @Bean
+    @Produces
     public SimpleClientHttpRequestFactory gigaChatRequestFactory() throws Exception {
         SSLContext sslContext = SSLContext.getInstance("TLS");
         sslContext.init(null, new TrustManager[]{new X509TrustManager() {
@@ -48,7 +47,7 @@ public class LlmConfig {
         return requestFactory;
     }
 
-    @Bean
+    @Produces
     public RestClient gigaChatClient(
             SimpleClientHttpRequestFactory gigaChatRequestFactory,
             @Value("${gigachat.auth-key}") String authKey,
