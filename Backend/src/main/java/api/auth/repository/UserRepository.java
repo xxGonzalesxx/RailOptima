@@ -1,16 +1,26 @@
+
 package api.auth.repository;
 
 import api.auth.model.User;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
+import io.quarkus.hibernate.reactive.panache.PanacheRepositoryBase;
+import io.smallrye.mutiny.Uni;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Optional;
 import java.util.UUID;
 
-@Repository
-public interface UserRepository extends JpaRepository<User, UUID> {
+@ApplicationScoped
+public class UserRepository
+        implements PanacheRepositoryBase<User, UUID> {
 
-    Optional<User> findByEmail(String email);
+    public Uni<Optional<User>> findByEmail(String email) {
+        return find("email", email)
+                .firstResult()
+                .map(Optional::ofNullable);
+    }
 
-    boolean existsByEmail(String email);
+    public Uni<Boolean> existsByEmail(String email) {
+        return count("email", email)
+                .map(count -> count > 0);
+    }
 }

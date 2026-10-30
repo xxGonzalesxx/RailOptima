@@ -1,5 +1,7 @@
+
 package api.llm.service;
 
+import api.llm.client.GigaChatClient;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
@@ -14,11 +16,13 @@ public class LlmService {
 
     public String ask(String question) {
         try {
-            // Вызываем наш кастомный клиент на java.net.http.HttpClient
             return gigaChatClient.chat(question);
-        } catch (Exception e) {
+        } catch (IllegalStateException e) {
             log.error("Ошибка при обращении к GigaChat", e);
-            throw new IllegalStateException("GigaChat временно недоступен, попробуйте позже");
+            throw new IllegalStateException(
+                    "GigaChat временно недоступен, попробуйте позже",
+                    e
+            );
         }
     }
 }

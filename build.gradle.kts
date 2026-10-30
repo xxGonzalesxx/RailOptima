@@ -1,8 +1,8 @@
 
 plugins {
     java
-    id("io.quarkus") version "3.40.1"
-    id("io.freefair.lombok") version "9.8.0"
+    id("io.quarkus") version "3.40.1.1"
+    id("io.freefair.lombok") version "9.8.3"
 }
 
 group = "com.railoptima"
@@ -13,37 +13,48 @@ java {
         languageVersion.set(JavaLanguageVersion.of(25))
     }
 }
-dependencies {
-    // Основная платформа Quarkus BOM
-    implementation(platform("io.quarkus.platform:quarkus-bom:3.40.1"))
 
-    // Core REST & Валидация
+dependencies {
+    implementation(enforcedPlatform("io.quarkus.platform:quarkus-bom:3.40.1.1"))
+
+    // REST API and validation
     implementation("io.quarkus:quarkus-rest")
     implementation("io.quarkus:quarkus-rest-jackson")
     implementation("io.quarkus:quarkus-hibernate-validator")
 
-    // REST Client для GigaChat (свой клиент с OAuth)
+    // Reactive PostgreSQL persistence
+    implementation("io.quarkus:quarkus-hibernate-reactive-panache")
+    implementation("io.quarkus:quarkus-reactive-pg-client")
+    implementation("io.quarkus:quarkus-reactive-transactions")
+
+    // GigaChat REST client
     implementation("io.quarkus:quarkus-rest-client")
     implementation("io.quarkus:quarkus-rest-client-jackson")
 
-    // Мониторинг
+    // Monitoring and API documentation
     implementation("io.quarkus:quarkus-smallrye-health")
     implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
+    implementation("io.quarkus:quarkus-smallrye-openapi")
 
-    // Security & JWT (нативный SmallRye)
+    // JWT and password hashing
     implementation("io.quarkus:quarkus-security")
     implementation("io.quarkus:quarkus-smallrye-jwt")
     implementation("io.quarkus:quarkus-smallrye-jwt-build")
     implementation("io.quarkus:quarkus-elytron-security-common")
 
-    // OpenAPI / Swagger UI
-    implementation("io.quarkus:quarkus-smallrye-openapi")
+    // YAML configuration
+    implementation("io.quarkus:quarkus-config-yaml")
 
-    // Persistence
-    implementation("io.quarkus:quarkus-hibernate-orm-panache")
-    implementation("io.quarkus:quarkus-jdbc-postgresql")
+    // Flyway uses JDBC; application persistence remains reactive
     implementation("io.quarkus:quarkus-flyway")
+    implementation("io.quarkus:quarkus-jdbc-postgresql")
 
+    // Container image building
+    implementation("io.quarkus:quarkus-container-image-jib")
+
+    // Tests
+    testImplementation("io.quarkus:quarkus-junit5")
+    testImplementation("io.rest-assured:rest-assured")
 }
 
 sourceSets {
@@ -51,20 +62,18 @@ sourceSets {
         java.srcDirs(file("Backend/src/main/java"))
         resources.srcDirs(file("Backend/src/main/resources"))
     }
+
     test {
         java.srcDirs(file("Backend/src/test/java"))
         resources.srcDirs(file("Backend/src/test/resources"))
     }
 }
 
-// Ленивая конфигурация компиляции
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-Xlint:deprecation")
 }
 
-// Ленивая конфигурация тестов (не ломает Configuration Cache)
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
-    enabled = false
 }
