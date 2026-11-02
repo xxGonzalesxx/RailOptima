@@ -1,7 +1,5 @@
 package api.common.exception;
 
-import org.springframework.http.HttpStatus;
-
 public class ConflictException extends BusinessException {
 
     // Дефолтный конструктор: сразу жестко зашивает статус 409

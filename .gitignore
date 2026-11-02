@@ -1,6 +1,6 @@
 # ---- Java / Gradle ----
 .gradle/
-build/
+**/build/
 !gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties
 out/
@@ -16,22 +16,36 @@ target/
 *.iws
 .vscode/
 
-# ---- Env / secrets ----
+# ---- Environment / secrets ----
 .env
-.env.local
-.env.*.local
+.env.*
 !.env.example
+!.env.*.example
+
+# Private keys and certificates
+/Backend/jwt-secret.jwk
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
 
 # ---- OS ----
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# ---- Logs ----
+# ---- Logs / temporary files ----
 *.log
+*.tmp
+*.swp
+*.swo
 
 # ---- Frontend ----
 Frontend/node_modules/
 Frontend/dist/
-
-# ---- Frontend generated ----
 Frontend/src/api/generated/
+
+# ---- Load testing ----
+k6-results/
+load-test-results/

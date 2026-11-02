@@ -1,27 +1,37 @@
+
 package api.llm.controller;
 
 import api.common.dto.ApiResponse;
 import api.llm.dto.AskRequest;
 import api.llm.dto.AskResponse;
 import api.llm.service.LlmService;
+import io.smallrye.common.annotation.Blocking;
+import jakarta.annotation.security.PermitAll;
+import jakarta.inject.Inject;
 import jakarta.validation.Valid;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
 
-@RestController
-@RequestMapping("/api/v1/llm")
+@Path("/api/v1/llm")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+@PermitAll
 public class LlmController {
 
     private final LlmService llmService;
 
+    @Inject
     public LlmController(LlmService llmService) {
         this.llmService = llmService;
     }
 
-    @PostMapping("/ask")
-    public ApiResponse<AskResponse> ask(@Valid @RequestBody AskRequest request) {
+    @POST
+    @Path("/ask")
+    @Blocking
+    public ApiResponse<AskResponse> ask(@Valid AskRequest request) {
         String answer = llmService.ask(request.question());
         return ApiResponse.success(new AskResponse(answer));
     }

@@ -1,3 +1,4 @@
+
 package api.project.controller;
 
 import api.common.dto.ApiResponse;
@@ -6,69 +7,69 @@ import api.project.dto.ProjectCreateRequest;
 import api.project.dto.ProjectResponse;
 import api.project.dto.ProjectUpdateRequest;
 import api.project.service.ProjectService;
+import io.smallrye.mutiny.Uni;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.jwt.JsonWebToken;
 
 import java.util.UUID;
 
-@RestController
-@RequestMapping("/api/v1/projects")
-@RequiredArgsConstructor
+@Path("/api/v1/projects")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+@RolesAllowed("USER")
 public class ProjectController {
 
-    private final ProjectService projectService;
+    @Inject
+    ProjectService projectService;
 
-    @PostMapping
-    public ResponseEntity<ApiResponse<ProjectResponse>> create(
-            @Valid @RequestBody ProjectCreateRequest request,
-            Authentication authentication
-    ) {
-        ProjectResponse response = projectService.createProject(request, authentication.getName());
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    @Inject
+    JsonWebToken jwt;
+
+    @POST
+    public Uni<Response> create(@Valid ProjectCreateRequest request) {
+        return projectService.createProject(request, jwt.getName())
+                .map(response -> Response.status(Response.Status.CREATED)
+                        .entity(ApiResponse.success(response))
+                        .build());
     }
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<PageResponse<ProjectResponse>>> getMyProjects(
-            Authentication authentication,
-            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable
+    @GET
+    public Uni<ApiResponse<PageResponse<ProjectResponse>>> getMyProjects(
+            @QueryParam("page") @DefaultValue("0") int pageIndex,
+            @QueryParam("size") @DefaultValue("20") int pageSize
     ) {
-        Page<ProjectResponse> page = projectService.getMyProjects(authentication.getName(), pageable);
-        return ResponseEntity.ok(ApiResponse.success(PageResponse.from(page)));
+        return projectService.getMyProjects(jwt.getName(), pageIndex, pageSize)
+                .map(ApiResponse::success);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ProjectResponse>> getOne(
-            @PathVariable UUID id,
-            Authentication authentication
+    @GET
+    @Path("/{id}")
+    public Uni<ApiResponse<ProjectResponse>> getOne(
+            @PathParam("id") UUID id
     ) {
-        ProjectResponse response = projectService.getProject(id, authentication.getName());
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return projectService.getProject(id, jwt.getName())
+                .map(ApiResponse::success);
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<ProjectResponse>> update(
-            @PathVariable UUID id,
-            @Valid @RequestBody ProjectUpdateRequest request,
-            Authentication authentication
+    @PUT
+    @Path("/{id}")
+    public Uni<ApiResponse<ProjectResponse>> update(
+            @PathParam("id") UUID id,
+            @Valid ProjectUpdateRequest request
     ) {
-        ProjectResponse response = projectService.updateProject(id, request, authentication.getName());
-        return ResponseEntity.ok(ApiResponse.success(response));
+        return projectService.updateProject(id, request, jwt.getName())
+                .map(ApiResponse::success);
     }
 
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(
-            @PathVariable UUID id,
-            Authentication authentication
-    ) {
-        projectService.deleteProject(id, authentication.getName());
-        return ResponseEntity.noContent().build();
+    @DELETE
+    @Path("/{id}")
+    public Uni<Response> delete(@PathParam("id") UUID id) {
+        return projectService.deleteProject(id, jwt.getName())
+                .replaceWith(Response.noContent().build());
     }
 }

@@ -1,7 +1,8 @@
 import { Link } from '@tanstack/react-router'
 import { motion } from 'motion/react'
-import { RailBuildScene } from '@/features/landing/RailBuildScene'
 import { CursorGlow } from '@/features/landing/CursorGlow'
+
+const CURRENT_YEAR = new Date().getFullYear()
 
 const stats = [
   { value: 'Авто', label: 'Расчёт по СНиП и ГОСТ', hint: 'без ручных таблиц' },
@@ -43,7 +44,6 @@ export function LandingPage() {
 
       <section className="relative mx-auto flex min-h-[85vh] max-w-7xl flex-col items-center justify-center px-6 text-center">
         <div className="absolute inset-0 bg-grid [mask-image:radial-gradient(ellipse_60%_60%_at_50%_30%,black,transparent)]" />
-        <RailBuildScene />
 
         <motion.div
           initial="hidden"
@@ -128,7 +128,7 @@ export function LandingPage() {
       </section>
 
       <footer className="relative z-10 border-t border-white/10 px-6 py-10 text-center text-sm text-white/40">
-        © {new Date().getFullYear()} RailOptima.
+        © {CURRENT_YEAR} RailOptima.
       </footer>
     </div>
   )

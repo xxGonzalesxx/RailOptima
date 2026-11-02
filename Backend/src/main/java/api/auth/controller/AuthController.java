@@ -1,3 +1,4 @@
+
 package api.auth.controller;
 
 import api.auth.dto.AuthResponse;
@@ -5,31 +6,39 @@ import api.auth.dto.LoginRequest;
 import api.auth.dto.RegisterRequest;
 import api.auth.service.AuthService;
 import api.common.dto.ApiResponse;
+import io.smallrye.mutiny.Uni;
+import jakarta.annotation.security.PermitAll;
+import jakarta.inject.Inject;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 
-@RestController
-@RequestMapping("/api/v1/auth")
-@RequiredArgsConstructor
+@Path("/api/v1/auth")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+@PermitAll
 public class AuthController {
 
-    private final AuthService authService;
+    @Inject
+    AuthService authService;
 
-    @PostMapping("/register")
-    public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
-        AuthResponse response = authService.register(request);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    @POST
+    @Path("/register")
+    public Uni<Response> register(@Valid RegisterRequest request) {
+        return authService.register(request)
+                .map(response -> Response.status(Response.Status.CREATED)
+                        .entity(ApiResponse.success(response))
+                        .build());
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<ApiResponse<AuthResponse>> login(@Valid @RequestBody LoginRequest request) {
-        AuthResponse response = authService.login(request);
-        return ResponseEntity.ok(ApiResponse.success(response));
+    @POST
+    @Path("/login")
+    public Uni<ApiResponse<AuthResponse>> login(@Valid LoginRequest request) {
+        return authService.login(request)
+                .map(ApiResponse::success);
     }
 }

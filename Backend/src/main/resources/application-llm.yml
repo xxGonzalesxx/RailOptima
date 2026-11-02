@@ -1,10 +1,5 @@
-spring:
-  ai:
-    openai:
-      base-url: https://api.giga.chat
-
-# Ваши параметры авторизации, считываемые интерцептором из .env файла
 gigachat:
-  auth-key: ${GIGACHAT_AUTH_KEY:}
+  auth-key: ${GIGACHAT_AUTH_KEY}
+  api-url: ${GIGACHAT_API_URL:https://gigachat.devices.sberbank.ru/api/v1}
   scope: ${GIGACHAT_SCOPE:GIGACHAT_API_PERS}
-  model: GigaChat-3-Ultra
+  model: ${GIGACHAT_MODEL:GigaChat}

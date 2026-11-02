@@ -48,7 +48,13 @@ const projectsRoute = createRoute({
   ),
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, loginRoute, registerRoute, dashboardRoute, projectsRoute])
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  loginRoute,
+  registerRoute,
+  dashboardRoute,
+  projectsRoute
+])
 
 export const router = createRouter({ routeTree })
 
