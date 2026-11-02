@@ -5,7 +5,6 @@ import { RegisterPage } from '@/pages/RegisterPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { ProtectedRoute } from './ProtectedRoute'
 import { ProjectsPage } from '@/pages/ProjectsPage'
-import { PlaygroundPage } from '@/pages/PlaygroundPage'
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -49,19 +48,12 @@ const projectsRoute = createRoute({
   ),
 })
 
-const playgroundRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/playground',
-  component: PlaygroundPage,
-})
-
 const routeTree = rootRoute.addChildren([
   indexRoute,
   loginRoute,
   registerRoute,
   dashboardRoute,
-  projectsRoute,
-  playgroundRoute
+  projectsRoute
 ])
 
 export const router = createRouter({ routeTree })
