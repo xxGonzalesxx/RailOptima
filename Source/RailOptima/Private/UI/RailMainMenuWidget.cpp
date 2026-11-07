@@ -1177,14 +1177,14 @@ void URailMainMenuWidget::HandleBrowseFileClicked()
 	{
 		bSuccess = URailProjectManager::OpenFileDialogWindows(
 			TEXT("Выберите файл цифровой модели рельефа GeoTIFF"),
-			TEXT("Файлы GeoTIFF (*.tif;*.tiff) *.tif;*.tiff Все файлы (*.*) *.* "),
+			TEXT("Файлы GeoTIFF (*.tif;*.tiff)\0*.tif;*.tiff\0Все файлы (*.*)\0*.*\0"),
 			SelectedFile);
 	}
 	else
 	{
 		bSuccess = URailProjectManager::OpenFileDialogWindows(
 			TEXT("Выберите 16-битную карту высот PNG"),
-			TEXT("Файлы PNG (*.png) *.png Все файлы (*.*) *.* "),
+			TEXT("Файлы PNG (*.png)\0*.png\0Все файлы (*.*)\0*.*\0"),
 			SelectedFile);
 	}
 

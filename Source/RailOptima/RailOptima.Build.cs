@@ -26,16 +26,7 @@ public class RailOptima : ModuleRules
 
         PrivateDependencyModuleNames.AddRange(new string[]
         {
-            "HTTP",             // REST API
-            "Json",
-            "JsonUtilities",
-            "UMG",              // UI
-            "Slate",
-            "SlateCore",
-            "ProceduralMeshComponent", // для PathRenderer (лента маршрута),
             "xlsxwriter"
         });
-
-        PublicIncludePaths.Add(ModuleDirectory);
     }
 }

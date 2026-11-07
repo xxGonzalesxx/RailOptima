@@ -3,7 +3,7 @@
 // «Разработка программы проектирования железнодорожных путей: модуль визуализации»,
 // ПривГУПС, 2026.
 
-#include "RailOptimaGameMode.h"
+#include "RailOptimaGameMode/RailOptimaGameMode.h"
 #include "Algorithms/AStarPathFinder.h"
 #include "Algorithms/CostCalculator.h"
 #include "Algorithms/RailPathValidator.h"
