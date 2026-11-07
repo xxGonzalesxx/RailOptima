@@ -16,52 +16,20 @@ void URailSettingsManager::InitializeSettings(bool bForceBenchmark)
 
 	Settings->LoadSettings();
 
-	bool bBenchmarkDone = false;
-	GConfig->GetBool(TEXT("RailOptima"), TEXT("bHardwareBenchmarkCompleted"), bBenchmarkDone, GGameIni);
+	UE_LOG(LogTemp, Log, TEXT("[RailSettings] Принудительная активация режима для слабого железа (Low-End)."));
 
-	if (!bBenchmarkDone || bForceBenchmark)
-	{
-		UE_LOG(LogTemp, Log, TEXT("[RailSettings] Автонастройка: запуск бенчмарка оборудования..."));
-		Settings->RunHardwareBenchmark(10, 1.0f, 1.0f);
-		Settings->ApplyHardwareBenchmarkResults();
+	Settings->SetOverallScalabilityLevel(0);
+	Settings->SetResolutionScaleNormalized(0.70f);
+	Settings->SetFrameRateLimit(60.0f);
+	Settings->SetVSyncEnabled(false);
 
-		const int32 Overall = Settings->GetOverallScalabilityLevel();
-		UE_LOG(LogTemp, Log, TEXT("[RailSettings] Результат бенчмарка: уровень масштабирования = %d"), Overall);
+	ApplyLowEndOptimizations(true);
 
-		if (Overall <= 0)
-		{
-			// Слабое железо: применяем щадящие лимиты и консольные оптимизации
-			Settings->SetFrameRateLimit(60.0f);
-			Settings->SetResolutionScaleNormalized(0.70f);
-			ApplyLowEndOptimizations(true);
-		}
-		else if (Overall == 1)
-		{
-			Settings->SetFrameRateLimit(60.0f);
-			Settings->SetResolutionScaleNormalized(0.85f);
-			ApplyLowEndOptimizations(false);
-		}
-		else
-		{
-			Settings->SetFrameRateLimit(0.0f);
-			Settings->SetResolutionScaleNormalized(1.0f);
-			ApplyLowEndOptimizations(false);
-		}
+	Settings->ApplySettings(false);
+	Settings->SaveSettings();
 
-		Settings->ApplySettings(false);
-		Settings->SaveSettings();
-
-		GConfig->SetBool(TEXT("RailOptima"), TEXT("bHardwareBenchmarkCompleted"), true, GGameIni);
-		GConfig->Flush(false, GGameIni);
-	}
-	else
-	{
-		if (Settings->GetOverallScalabilityLevel() <= 0)
-		{
-			ApplyLowEndOptimizations(true);
-		}
-		Settings->ApplySettings(false);
-	}
+	GConfig->SetBool(TEXT("RailOptima"), TEXT("bHardwareBenchmarkCompleted"), true, GGameIni);
+	GConfig->Flush(false, GGameIni);
 }
 
 void URailSettingsManager::ApplyQualityPreset(int32 PresetLevel)
@@ -72,51 +40,22 @@ void URailSettingsManager::ApplyQualityPreset(int32 PresetLevel)
 		return;
 	}
 
-	const int32 Level = FMath::Clamp(PresetLevel, 0, 3);
+	// Пока жестко фиксируем пресет 0 (Низкое / Слабый ПК)
+	const int32 Level = 0;
 	Settings->SetOverallScalabilityLevel(Level);
-
-	switch (Level)
-	{
-	case 0: // Низкое (Слабый ПК)
-		Settings->SetResolutionScaleNormalized(0.70f);
-		Settings->SetFrameRateLimit(60.0f);
-		Settings->SetVSyncEnabled(false);
-		ApplyLowEndOptimizations(true);
-		break;
-
-	case 1: // Среднее
-		Settings->SetResolutionScaleNormalized(0.85f);
-		Settings->SetFrameRateLimit(60.0f);
-		Settings->SetVSyncEnabled(false);
-		ApplyLowEndOptimizations(false);
-		break;
-
-	case 2: // Высокое
-		Settings->SetResolutionScaleNormalized(1.0f);
-		Settings->SetFrameRateLimit(0.0f);
-		ApplyLowEndOptimizations(false);
-		break;
-
-	case 3: // Ультра
-	default:
-		Settings->SetResolutionScaleNormalized(1.0f);
-		Settings->SetFrameRateLimit(0.0f);
-		ApplyLowEndOptimizations(false);
-		break;
-	}
+	Settings->SetResolutionScaleNormalized(0.70f);
+	Settings->SetFrameRateLimit(60.0f);
+	Settings->SetVSyncEnabled(false);
+	ApplyLowEndOptimizations(true);
 
 	Settings->ApplySettings(false);
 	Settings->SaveSettings();
-	UE_LOG(LogTemp, Log, TEXT("[RailSettings] Применён пресет графики: %d"), Level);
+	UE_LOG(LogTemp, Log, TEXT("[RailSettings] Применён принудительный пресет для слабого ПК: %d"), Level);
 }
 
 int32 URailSettingsManager::GetCurrentQualityPreset()
 {
-	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
-	{
-		return Settings->GetOverallScalabilityLevel();
-	}
-	return 2;
+	return 0;
 }
 
 void URailSettingsManager::RunAutoBenchmark()
@@ -139,7 +78,7 @@ float URailSettingsManager::GetResolutionScale()
 	{
 		return Settings->GetResolutionScaleNormalized() * 100.0f;
 	}
-	return 100.0f;
+	return 70.0f;
 }
 
 void URailSettingsManager::SetFrameRateLimit(float Limit)
@@ -156,7 +95,7 @@ float URailSettingsManager::GetFrameRateLimit()
 	{
 		return Settings->GetFrameRateLimit();
 	}
-	return 0.0f;
+	return 60.0f;
 }
 
 void URailSettingsManager::SetVSyncEnabled(bool bEnabled)
@@ -180,51 +119,39 @@ void URailSettingsManager::SetShadowQuality(int32 Quality)
 {
 	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
 	{
-		Settings->SetShadowQuality(FMath::Clamp(Quality, 0, 3));
+		Settings->SetShadowQuality(0);
 	}
 }
 
 int32 URailSettingsManager::GetShadowQuality()
 {
-	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
-	{
-		return Settings->GetShadowQuality();
-	}
-	return 2;
+	return 0;
 }
 
 void URailSettingsManager::SetAntiAliasingQuality(int32 Quality)
 {
 	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
 	{
-		Settings->SetAntiAliasingQuality(FMath::Clamp(Quality, 0, 3));
+		Settings->SetAntiAliasingQuality(0);
 	}
 }
 
 int32 URailSettingsManager::GetAntiAliasingQuality()
 {
-	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
-	{
-		return Settings->GetAntiAliasingQuality();
-	}
-	return 2;
+	return 0;
 }
 
 void URailSettingsManager::SetViewDistanceQuality(int32 Quality)
 {
 	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
 	{
-		Settings->SetViewDistanceQuality(FMath::Clamp(Quality, 0, 3));
+		Settings->SetViewDistanceQuality(0);
 	}
 }
 
 int32 URailSettingsManager::GetViewDistanceQuality()
 {
-	if (UGameUserSettings* Settings = GEngine ? GEngine->GetGameUserSettings() : nullptr)
-	{
-		return Settings->GetViewDistanceQuality();
-	}
-	return 2;
+	return 0;
 }
 
 void URailSettingsManager::ApplyLowEndOptimizations(bool bEnableLowEnd)
@@ -234,22 +161,14 @@ void URailSettingsManager::ApplyLowEndOptimizations(bool bEnableLowEnd)
 		return;
 	}
 
-	if (bEnableLowEnd)
-	{
-		GEngine->Exec(nullptr, TEXT("r.Shadow.Virtual.Enable 0"));
-		GEngine->Exec(nullptr, TEXT("r.Lumen.DiffuseIndirect.Allow 0"));
-		GEngine->Exec(nullptr, TEXT("r.Lumen.Reflections.Allow 0"));
-		GEngine->Exec(nullptr, TEXT("r.DistanceFieldShadowing 0"));
-		GEngine->Exec(nullptr, TEXT("r.VolumetricFog 0"));
-		UE_LOG(LogTemp, Log, TEXT("[RailSettings] Активированы оптимизации для слабого оборудования"));
-	}
-	else
-	{
-		GEngine->Exec(nullptr, TEXT("r.Shadow.Virtual.Enable 1"));
-		GEngine->Exec(nullptr, TEXT("r.Lumen.DiffuseIndirect.Allow 1"));
-		GEngine->Exec(nullptr, TEXT("r.Lumen.Reflections.Allow 1"));
-		GEngine->Exec(nullptr, TEXT("r.VolumetricFog 1"));
-	}
+	// Всегда включаем оптимизации для слабого оборудования
+	GEngine->Exec(nullptr, TEXT("r.Shadow.Virtual.Enable 0"));
+	GEngine->Exec(nullptr, TEXT("r.Lumen.DiffuseIndirect.Allow 0"));
+	GEngine->Exec(nullptr, TEXT("r.Lumen.Reflections.Allow 0"));
+	GEngine->Exec(nullptr, TEXT("r.DistanceFieldShadowing 0"));
+	GEngine->Exec(nullptr, TEXT("r.VolumetricFog 0"));
+	GEngine->Exec(nullptr, TEXT("r.Streaming.PoolSize 1500"));
+	UE_LOG(LogTemp, Log, TEXT("[RailSettings] Активированы жесткие оптимизации для слабого оборудования (GTX 1650 / 4GB VRAM)"));
 }
 
 void URailSettingsManager::SaveSettings()
