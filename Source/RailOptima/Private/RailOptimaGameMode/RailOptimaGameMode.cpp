@@ -629,6 +629,38 @@ void ARailOptimaGameMode::RecomputePath()
 		else
 			CachedGrid = GenerateSyntheticGrid(336, RuntimeSettings.TargetStepSize_m);
 		bGridCached = CachedGrid.Width > 1 && CachedGrid.Height > 1;
+
+		if (bGridCached)
+		{
+			TArray<float> Slopes;
+			Slopes.Reserve(CachedGrid.Width * CachedGrid.Height * 2);
+			float MinH = TNumericLimits<float>::Max();
+			float MaxH = -TNumericLimits<float>::Max();
+			for (int32 Y = 0; Y < CachedGrid.Height - 1; ++Y)
+			{
+				for (int32 X = 0; X < CachedGrid.Width - 1; ++X)
+				{
+					const float H = CachedGrid.Nodes[CachedGrid.IndexOf(X, Y)].Height_m;
+					const float Hx = CachedGrid.Nodes[CachedGrid.IndexOf(X + 1, Y)].Height_m;
+					const float Hy = CachedGrid.Nodes[CachedGrid.IndexOf(X, Y + 1)].Height_m;
+					MinH = FMath::Min(MinH, H);
+					MaxH = FMath::Max(MaxH, H);
+					Slopes.Add(FMath::Abs(Hx - H) / CachedGrid.StepSize_m * 1000.0f);
+					Slopes.Add(FMath::Abs(Hy - H) / CachedGrid.StepSize_m * 1000.0f);
+				}
+			}
+			Slopes.Sort();
+			const int32 N = Slopes.Num();
+			int32 Below15 = 0;
+			for (float S : Slopes)
+			{
+				if (S <= 15.0f) ++Below15;
+			}
+			UE_LOG(LogTemp, Warning,
+				TEXT("[PERF] Рельеф сетки: высоты %.0f..%.0f м | уклон ребра, ‰: p10=%.1f, медиана=%.1f, p90=%.1f, макс=%.1f | рёбер <=15‰: %.1f%%"),
+				MinH, MaxH, Slopes[N / 10], Slopes[N / 2], Slopes[N * 9 / 10], Slopes[N - 1],
+				100.0 * Below15 / FMath::Max(N, 1));
+		}
 	}
 
 	if (!bGridCached)
@@ -661,13 +693,19 @@ void ARailOptimaGameMode::RecomputePath()
 
 	const double	T0 = FPlatformTime::Seconds();
 	FRailPathResult Result = PathFinder->FindPath(CachedGrid, StartIdx, EndIdx);
+	const double FirstSearchMs = (FPlatformTime::Seconds() - T0) * 1000.0;
+	const bool	 bFirstFound = Result.bFound;
+	const int32	 FirstExpanded = Result.ExpandedNodes;
 
 	// 2. Если на крутом горном рельефе прямой путь <= 15‰ невозможен, делаем fallback
 	// с допуском горных/тоннельных участков (с высокими надбавками НЦС за мосты/тоннели)
 	if (!Result.bFound)
 	{
+		UE_LOG(LogTemp, Warning, TEXT("[PERF] ФОЛЛБЭК: первый поиск не нашёл путь за %.1f мс (расширено %d из %d узлов)."),
+			FirstSearchMs, FirstExpanded, CachedGrid.Nodes.Num());
+
 		FRailCategoryNorms RelaxedNorms = Norms;
-		RelaxedNorms.MaxSlopePermille = 150.0f;
+		RelaxedNorms.MaxSlopePermille = 150.0f;	
 		PathFinder->SetCategoryNorms(RelaxedNorms);
 		Result = PathFinder->FindPath(CachedGrid, StartIdx, EndIdx);
 		PathFinder->SetCategoryNorms(Norms);
@@ -695,7 +733,10 @@ void ARailOptimaGameMode::RecomputePath()
 	// 3. Строим трассу с вписыванием стандартных радиусов СП 119.13330 и вертикальных кривых
 	float			MinPlanRadius_m = 0.0f;
 	float			MaxSlopePermille = 0.0f;
+	const double	TArc0 = FPlatformTime::Seconds();
 	TArray<FVector> SmoothPoints = GenerateRailwayArcs(CachedGrid, Result, Norms, MinPlanRadius_m, MaxSlopePermille);
+	const double	ArcsMs = (FPlatformTime::Seconds() - TArc0) * 1000.0;
+	double			RenderMs = 0.0;	
 
 	// 4. Валидация по СП 119.13330 (проверка построенной 3D трассы)
 	if (PathValidator && SmoothPoints.Num() > 1)
@@ -748,7 +789,9 @@ void ARailOptimaGameMode::RecomputePath()
 			}
 		}
 
+		const double TRen0 = FPlatformTime::Seconds();
 		PathRenderer->RenderCustomPath(SmoothPoints, Colors);
+		RenderMs = (FPlatformTime::Seconds() - TRen0) * 1000.0;
 	}
 	else
 	{
@@ -776,6 +819,13 @@ void ARailOptimaGameMode::RecomputePath()
 	UE_LOG(LogTemp, Log,
 		TEXT("[RailGM] Путь [%s]: длина=%.0f м, смета=%.1f млн руб., макс.уклон=%.1f‰, мин.R=%.0f м, время=%.1f мс."),
 		*Norms.CategoryName, Result.TotalLength_m, Result.TotalCost / 1000.0, MaxSlopePermille, MinPlanRadius_m, Ms);
+
+
+	 UE_LOG(LogTemp, Warning,
+		TEXT("[PERF] сетка=%dx%d (%d узлов), шаг=%.0f м | A* №1: %.1f мс, расширено=%d, найден=%d | A* итого (с фоллбэком): %.1f мс, расширено=%d | дуги: %.1f мс | рендер: %.1f мс"),
+		CachedGrid.Width, CachedGrid.Height, CachedGrid.Nodes.Num(), CachedGrid.StepSize_m,
+		FirstSearchMs, FirstExpanded, bFirstFound ? 1 : 0,
+		Ms, Result.ExpandedNodes, ArcsMs, RenderMs);
 
 	OnPathRecomputed.Broadcast(Result.TotalLength_m, Result.TotalCost, Ms, Result.NodeIndices.Num());
 }
