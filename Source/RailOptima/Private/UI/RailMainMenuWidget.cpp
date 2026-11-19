@@ -1,5 +1,5 @@
 ﻿// Copyright (c) 2026 Николайчик А.В. Все права защищены.
-// Реализация главного меню и дашборда проектов RailOptima
+// Реализация главного меню и дашборда проектов RailOptima с поддержкой Backend API и облачной синхронизации
 
 #include "UI/RailMainMenuWidget.h"
 #include "Blueprint/WidgetTree.h"
@@ -24,6 +24,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Misc/Paths.h"
 #include "Services/RailProjectManager.h"
+#include "Services/RailApiService.h"
 #include "Styling/CoreStyle.h"
 
 namespace
@@ -37,6 +38,10 @@ namespace
 		return Style;
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────
+//  Вспомогательные классы действий
+// ─────────────────────────────────────────────────────────────────
 
 void URailProjectActionHelper::OnOpenClicked()
 {
@@ -67,6 +72,49 @@ void URailProjectActionHelper::OnDeleteClicked()
 	}
 }
 
+void URailProjectActionHelper::OnSyncToCloudClicked()
+{
+	if (MenuWidget.IsValid())
+	{
+		URailApiService* Api = URailApiService::Get(MenuWidget.Get());
+		if (!Api || !Api->IsAuthenticated())
+		{
+			MenuWidget->ShowToast(TEXT("Для синхронизации необходимо войти в облако"), ERailToastType::Warning);
+			MenuWidget->HandleAuthButtonClicked();
+			return;
+		}
+
+		MenuWidget->ShowToast(FString::Printf(TEXT("Отправка проекта '%s' в облако..."), *ProjectMeta.ProjectName), ERailToastType::Info);
+		Api->SyncLocalProjectToCloud(ProjectMeta);
+	}
+}
+
+void URailCloudProjectActionHelper::OnCreateLocalCloneClicked()
+{
+	if (MenuWidget.IsValid())
+	{
+		MenuWidget->ShowToast(FString::Printf(TEXT("Облачный проект '%s' выбран. Настройте карту высот для 3D-трассировки."), *CloudProject.Name), ERailToastType::Info);
+		MenuWidget->HandleNewProjectClicked();
+	}
+}
+
+void URailCloudProjectActionHelper::OnDeleteFromCloudClicked()
+{
+	if (MenuWidget.IsValid())
+	{
+		URailApiService* Api = URailApiService::Get(MenuWidget.Get());
+		if (Api)
+		{
+			MenuWidget->ShowToast(FString::Printf(TEXT("Удаление проекта '%s' из облака..."), *CloudProject.Name), ERailToastType::Info);
+			Api->DeleteRemoteProject(CloudProject.Id);
+		}
+	}
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  Построение UI
+// ─────────────────────────────────────────────────────────────────
+
 TSharedRef<SWidget> URailMainMenuWidget::RebuildWidget()
 {
 	if (!WidgetTree->RootWidget)
@@ -92,6 +140,7 @@ TSharedRef<SWidget> URailMainMenuWidget::RebuildWidget()
 
 		// Модальные окна и оверлей
 		BuildCreateProjectModal(RootCanvas);
+		BuildCreateCloudProjectModal(RootCanvas);
 		BuildAuthModal(RootCanvas);
 		BuildLoadingOverlay(RootCanvas);
 
@@ -106,7 +155,23 @@ TSharedRef<SWidget> URailMainMenuWidget::RebuildWidget()
 			ToastSlot->SetAutoSize(true);
 		}
 
-		// Заполнение библиотеки проектов
+		// Подписка на события API
+		if (URailApiService* Api = URailApiService::Get(this))
+		{
+			Api->OnAuthCompleted.RemoveDynamic(this, &URailMainMenuWidget::HandleApiAuthCompleted);
+			Api->OnAuthCompleted.AddDynamic(this, &URailMainMenuWidget::HandleApiAuthCompleted);
+
+			Api->OnProjectsListReceived.RemoveDynamic(this, &URailMainMenuWidget::HandleApiProjectsReceived);
+			Api->OnProjectsListReceived.AddDynamic(this, &URailMainMenuWidget::HandleApiProjectsReceived);
+
+			Api->OnProjectActionCompleted.RemoveDynamic(this, &URailMainMenuWidget::HandleApiProjectActionCompleted);
+			Api->OnProjectActionCompleted.AddDynamic(this, &URailMainMenuWidget::HandleApiProjectActionCompleted);
+
+			Api->OnProjectDeleted.RemoveDynamic(this, &URailMainMenuWidget::HandleApiProjectDeleted);
+			Api->OnProjectDeleted.AddDynamic(this, &URailMainMenuWidget::HandleApiProjectDeleted);
+		}
+
+		UpdateHeaderProfileUI();
 		RefreshProjectLibrary();
 	}
 
@@ -147,13 +212,13 @@ void URailMainMenuWidget::BuildHeader(UVerticalBox* MainVBox)
 	}
 
 	UTextBlock* VersionText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	VersionText->SetText(FText::FromString(TEXT("v0.6.0")));
+	VersionText->SetText(FText::FromString(TEXT("v0.6.0 • Cloud API")));
 	VersionText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 10));
 	VersionText->SetColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.85f, 1.0f, 1.0f)));
 	VersionBadge->SetContent(VersionText);
 
 	UTextBlock* SubtitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	SubtitleText->SetText(FText::FromString(TEXT("САПР железнодорожных путей • Модуль 3D-трассировки и оптимизации по СП 119.13330")));
+	SubtitleText->SetText(FText::FromString(TEXT("САПР железнодорожных путей • Модуль 3D-трассировки и оптимизации по СП 119.13330 • Backend REST API")));
 	SubtitleText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
 	SubtitleText->SetColorAndOpacity(FSlateColor(FLinearColor(0.6f, 0.68f, 0.78f, 1.0f)));
 	LogoVBox->AddChildToVerticalBox(SubtitleText);
@@ -171,11 +236,11 @@ void URailMainMenuWidget::BuildHeader(UVerticalBox* MainVBox)
 	ProfilePill->SetPadding(FMargin(14.0f, 8.0f));
 	ProfileHBox->AddChildToHorizontalBox(ProfilePill);
 
-	UTextBlock* ProfileText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	ProfileText->SetText(FText::FromString(TEXT("Инженер (Локальный профиль)")));
-	ProfileText->SetFont(FCoreStyle::GetDefaultFontStyle("Medium", 11));
-	ProfileText->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
-	ProfilePill->SetContent(ProfileText);
+	ProfileStatusText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	ProfileStatusText->SetText(FText::FromString(TEXT("Инженер (Локальный профиль)")));
+	ProfileStatusText->SetFont(FCoreStyle::GetDefaultFontStyle("Medium", 11));
+	ProfileStatusText->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
+	ProfilePill->SetContent(ProfileStatusText);
 
 	USpacer* Spacer1 = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
 	Spacer1->SetSize(FVector2D(10.0f, 1.0f));
@@ -195,11 +260,40 @@ void URailMainMenuWidget::BuildHeader(UVerticalBox* MainVBox)
 	AuthBtnInner->SetPadding(FMargin(14.0f, 8.0f));
 	AuthBtn->AddChild(AuthBtnInner);
 
-	UTextBlock* AuthBtnText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	AuthBtnText->SetText(FText::FromString(TEXT("Облако / Авторизация")));
-	AuthBtnText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
-	AuthBtnText->SetColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f)));
-	AuthBtnInner->SetContent(AuthBtnText);
+	AuthButtonText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	AuthButtonText->SetText(FText::FromString(TEXT("Облако / Вход")));
+	AuthButtonText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	AuthButtonText->SetColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f)));
+	AuthBtnInner->SetContent(AuthButtonText);
+}
+
+void URailMainMenuWidget::UpdateHeaderProfileUI()
+{
+	URailApiService* Api = URailApiService::Get(this);
+	if (Api && Api->IsAuthenticated())
+	{
+		if (ProfileStatusText)
+		{
+			ProfileStatusText->SetText(FText::FromString(FString::Printf(TEXT("👤 %s (Облако: %s)"), *Api->GetAuthData().Email, *Api->GetAuthData().Role)));
+			ProfileStatusText->SetColorAndOpacity(FSlateColor(FLinearColor(0.2f, 0.9f, 0.6f, 1.0f)));
+		}
+		if (AuthButtonText)
+		{
+			AuthButtonText->SetText(FText::FromString(TEXT("Кабинет / Выйти")));
+		}
+	}
+	else
+	{
+		if (ProfileStatusText)
+		{
+			ProfileStatusText->SetText(FText::FromString(TEXT("Инженер (Локальный профиль)")));
+			ProfileStatusText->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
+		}
+		if (AuthButtonText)
+		{
+			AuthButtonText->SetText(FText::FromString(TEXT("Облако / Вход")));
+		}
+	}
 }
 
 void URailMainMenuWidget::BuildContentArea(UVerticalBox* MainVBox)
@@ -264,7 +358,7 @@ void URailMainMenuWidget::BuildContentArea(UVerticalBox* MainVBox)
 	FolderBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleOpenProjectsFolderClicked);
 	if (UVerticalBoxSlot* BtnSlot = ActionVBox->AddChildToVerticalBox(FolderBtn))
 	{
-		BtnSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 16.0f));
+		BtnSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 10.0f));
 	}
 
 	UBorder* FolderInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
@@ -301,7 +395,7 @@ void URailMainMenuWidget::BuildContentArea(UVerticalBox* MainVBox)
 	SettingsText->SetColorAndOpacity(FSlateColor(FLinearColor(0.90f, 0.94f, 1.0f, 1.0f)));
 	SettingsInner->SetContent(SettingsText);
 
-	// Карточка интеграции с OpenTopography
+	// Карточка интеграции с Backend и OpenTopography
 	UBorder* OpenTopoCard = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
 	OpenTopoCard->SetBrushColor(FLinearColor(0.03f, 0.07f, 0.12f, 0.75f));
 	OpenTopoCard->SetPadding(FMargin(14.0f, 12.0f));
@@ -311,7 +405,7 @@ void URailMainMenuWidget::BuildContentArea(UVerticalBox* MainVBox)
 	OpenTopoCard->SetContent(OpenTopoVBox);
 
 	UTextBlock* OpenTopoTitle = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	OpenTopoTitle->SetText(FText::FromString(TEXT("Веб-сервис и OpenTopography")));
+	OpenTopoTitle->SetText(FText::FromString(TEXT("Синхронизация с экосистемой")));
 	OpenTopoTitle->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
 	OpenTopoTitle->SetColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f)));
 	if (UVerticalBoxSlot* SubSlot = OpenTopoVBox->AddChildToVerticalBox(OpenTopoTitle))
@@ -320,7 +414,7 @@ void URailMainMenuWidget::BuildContentArea(UVerticalBox* MainVBox)
 	}
 
 	UTextBlock* OpenTopoDesc = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	OpenTopoDesc->SetText(FText::FromString(TEXT("В веб-версии интегрирован выбор зоны рельефа через спутниковый сервис OpenTopography. Зона выбирается прямо на интерактивной карте и синхронизируется с проектом.")));
+	OpenTopoDesc->SetText(FText::FromString(TEXT("Клиент подключен к единому Backend API. Проекты синхронизируются между Web Platform и 3D Desktop клиентом.")));
 	OpenTopoDesc->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
 	OpenTopoDesc->SetAutoWrapText(true);
 	OpenTopoDesc->SetWrapTextAt(310.0f);
@@ -332,7 +426,7 @@ void URailMainMenuWidget::BuildContentArea(UVerticalBox* MainVBox)
 	ColSpacer->SetSize(FVector2D(24.0f, 1.0f));
 	ContentHBox->AddChildToHorizontalBox(ColSpacer);
 
-	// ─── Правая колонка: Библиотека локальных проектов (Fill) ───
+	// ─── Правая колонка: Библиотека проектов (Fill) ───
 	UBorder* LibraryCard = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
 	LibraryCard->SetBrushColor(FLinearColor(0.02f, 0.04f, 0.07f, 0.90f));
 	LibraryCard->SetPadding(FMargin(22.0f, 18.0f));
@@ -344,32 +438,84 @@ void URailMainMenuWidget::BuildContentArea(UVerticalBox* MainVBox)
 	UVerticalBox* LibVBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	LibraryCard->SetContent(LibVBox);
 
-	// Заголовок библиотеки
-	UHorizontalBox* LibHeaderHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	if (UVerticalBoxSlot* SubSlot = LibVBox->AddChildToVerticalBox(LibHeaderHBox))
+	// Вкладки переключения: Локальные / Облачные проекты
+	UHorizontalBox* TabsHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	if (UVerticalBoxSlot* SubSlot = LibVBox->AddChildToVerticalBox(TabsHBox))
 	{
 		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 14.0f));
 	}
 
-	UTextBlock* LibTitle = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	LibTitle->SetText(FText::FromString(TEXT("БИБЛИОТЕКА ПРОЕКТОВ")));
-	LibTitle->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 13));
-	LibTitle->SetColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f)));
-	if (UHorizontalBoxSlot* SubSlot = LibHeaderHBox->AddChildToHorizontalBox(LibTitle))
+	TabLocalBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	TabLocalBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.06f, 0.24f, 0.42f, 0.95f), FLinearColor(0.1f, 0.34f, 0.58f, 1.0f), FLinearColor(0.04f, 0.18f, 0.32f, 1.0f)));
+	TabLocalBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleTabLocalClicked);
+	if (UHorizontalBoxSlot* HSlot = TabsHBox->AddChildToHorizontalBox(TabLocalBtn))
 	{
-		SubSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-		SubSlot->SetVerticalAlignment(VAlign_Center);
+		HSlot->SetPadding(FMargin(0.0f, 0.0f, 6.0f, 0.0f));
+	}
+
+	UBorder* LocalTabInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	LocalTabInner->SetBrushColor(FLinearColor::Transparent);
+	LocalTabInner->SetPadding(FMargin(14.0f, 8.0f));
+	TabLocalBtn->AddChild(LocalTabInner);
+
+	TabLocalText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	TabLocalText->SetText(FText::FromString(TEXT("📁 Локальные проекты")));
+	TabLocalText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	TabLocalText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	LocalTabInner->SetContent(TabLocalText);
+
+	TabCloudBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	TabCloudBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.04f, 0.08f, 0.14f, 0.85f), FLinearColor(0.08f, 0.15f, 0.24f, 0.95f), FLinearColor(0.03f, 0.06f, 0.10f, 1.0f)));
+	TabCloudBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleTabCloudClicked);
+	TabsHBox->AddChildToHorizontalBox(TabCloudBtn);
+
+	UBorder* CloudTabInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	CloudTabInner->SetBrushColor(FLinearColor::Transparent);
+	CloudTabInner->SetPadding(FMargin(14.0f, 8.0f));
+	TabCloudBtn->AddChild(CloudTabInner);
+
+	TabCloudText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	TabCloudText->SetText(FText::FromString(TEXT("☁ Облачные проекты (API)")));
+	TabCloudText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
+	TabCloudText->SetColorAndOpacity(FSlateColor(FLinearColor(0.7f, 0.75f, 0.85f, 1.0f)));
+	CloudTabInner->SetContent(TabCloudText);
+
+	USpacer* TabSpacer = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
+	if (UHorizontalBoxSlot* HSlot = TabsHBox->AddChildToHorizontalBox(TabSpacer))
+	{
+		HSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
 	}
 
 	ProjectCountText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	ProjectCountText->SetText(FText::FromString(TEXT("Всего: 0")));
 	ProjectCountText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
 	ProjectCountText->SetColorAndOpacity(FSlateColor(FLinearColor(0.55f, 0.62f, 0.72f, 1.0f)));
-	if (UHorizontalBoxSlot* SubSlot = LibHeaderHBox->AddChildToHorizontalBox(ProjectCountText))
+	if (UHorizontalBoxSlot* SubSlot = TabsHBox->AddChildToHorizontalBox(ProjectCountText))
 	{
 		SubSlot->SetVerticalAlignment(VAlign_Center);
 		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 12.0f, 0.0f));
 	}
+
+	// Кнопка создать в облаке (для вкладки Cloud)
+	UButton* CreateCloudBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	CreateCloudBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.08f, 0.28f, 0.42f, 0.9f), FLinearColor(0.12f, 0.38f, 0.55f, 1.0f), FLinearColor(0.05f, 0.20f, 0.32f, 1.0f)));
+	CreateCloudBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleCreateCloudProjectClicked);
+	TabsHBox->AddChildToHorizontalBox(CreateCloudBtn);
+
+	UBorder* CloudBtnInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	CloudBtnInner->SetBrushColor(FLinearColor::Transparent);
+	CloudBtnInner->SetPadding(FMargin(10.0f, 6.0f));
+	CreateCloudBtn->AddChild(CloudBtnInner);
+
+	UTextBlock* CloudBtnText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	CloudBtnText->SetText(FText::FromString(TEXT("+ В облако")));
+	CloudBtnText->SetFont(FCoreStyle::GetDefaultFontStyle("Medium", 10));
+	CloudBtnText->SetColorAndOpacity(FSlateColor(FLinearColor(0.4f, 0.95f, 1.0f, 1.0f)));
+	CloudBtnInner->SetContent(CloudBtnText);
+
+	USpacer* BtnSpacer = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
+	BtnSpacer->SetSize(FVector2D(6.0f, 1.0f));
+	TabsHBox->AddChildToHorizontalBox(BtnSpacer);
 
 	// Кнопка обновить
 	UButton* RefreshBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
@@ -378,7 +524,7 @@ void URailMainMenuWidget::BuildContentArea(UVerticalBox* MainVBox)
 		FLinearColor(0.12f, 0.22f, 0.35f, 0.95f),
 		FLinearColor(0.04f, 0.08f, 0.15f, 1.0f)));
 	RefreshBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleRefreshLibraryClicked);
-	LibHeaderHBox->AddChildToHorizontalBox(RefreshBtn);
+	TabsHBox->AddChildToHorizontalBox(RefreshBtn);
 
 	UBorder* RefInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
 	RefInner->SetBrushColor(FLinearColor::Transparent);
@@ -394,7 +540,6 @@ void URailMainMenuWidget::BuildContentArea(UVerticalBox* MainVBox)
 	// Прокручиваемый список проектов
 	ProjectListScrollBox = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());
 	ProjectListScrollBox->SetOrientation(EOrientation::Orient_Vertical);
-	ProjectListScrollBox->SetScrollBarVisibility(ESlateVisibility::Visible);
 	if (UVerticalBoxSlot* SubSlot = LibVBox->AddChildToVerticalBox(ProjectListScrollBox))
 	{
 		SubSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
@@ -406,18 +551,19 @@ void URailMainMenuWidget::PopulateProjectCard(const FRailProjectMetadata& Meta, 
 	if (!TargetScrollBox)
 		return;
 
-	UBorder* Card = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
-	Card->SetBrushColor(FLinearColor(0.03f, 0.06f, 0.10f, 0.90f));
-	Card->SetPadding(FMargin(16.0f, 12.0f));
-	if (UScrollBoxSlot* SubSlot = Cast<UScrollBoxSlot>(TargetScrollBox->AddChild(Card)))
+	UBorder* CardBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	CardBorder->SetBrushColor(FLinearColor(0.025f, 0.045f, 0.075f, 0.85f));
+	CardBorder->SetPadding(FMargin(16.0f, 14.0f));
+
+	if (UScrollBoxSlot* CardSlot = Cast<UScrollBoxSlot>(TargetScrollBox->AddChild(CardBorder)))
 	{
-		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 10.0f));
+		CardSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 10.0f));
 	}
 
 	UHorizontalBox* CardHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	Card->SetContent(CardHBox);
+	CardBorder->SetContent(CardHBox);
 
-	// Левая часть карточки: описание проекта
+	// Левая колонка карточки: Текстовые данные
 	UVerticalBox* InfoVBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	if (UHorizontalBoxSlot* SubSlot = CardHBox->AddChildToHorizontalBox(InfoVBox))
 	{
@@ -425,58 +571,56 @@ void URailMainMenuWidget::PopulateProjectCard(const FRailProjectMetadata& Meta, 
 		SubSlot->SetVerticalAlignment(VAlign_Center);
 	}
 
+	UHorizontalBox* TitleLineHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	InfoVBox->AddChildToVerticalBox(TitleLineHBox);
+
 	UTextBlock* NameText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	NameText->SetText(FText::FromString(Meta.ProjectName));
 	NameText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 13));
 	NameText->SetColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.96f, 0.98f, 1.0f)));
-	InfoVBox->AddChildToVerticalBox(NameText);
+	TitleLineHBox->AddChildToHorizontalBox(NameText);
 
-	UHorizontalBox* MetaHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	if (UVerticalBoxSlot* SubSlot = InfoVBox->AddChildToVerticalBox(MetaHBox))
+	// Бейдж категории
+	UBorder* CatBadge = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	CatBadge->SetBrushColor(FLinearColor(0.08f, 0.24f, 0.42f, 0.85f));
+	CatBadge->SetPadding(FMargin(8.0f, 2.0f));
+	if (UHorizontalBoxSlot* SubSlot = TitleLineHBox->AddChildToHorizontalBox(CatBadge))
 	{
-		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 0.0f));
+		SubSlot->SetPadding(FMargin(10.0f, 0.0f, 0.0f, 0.0f));
+		SubSlot->SetVerticalAlignment(VAlign_Center);
 	}
 
-	UTextBlock* CatText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	CatText->SetText(FText::FromString(Meta.CategoryName));
-	CatText->SetFont(FCoreStyle::GetDefaultFontStyle("Medium", 10));
-	CatText->SetColorAndOpacity(FSlateColor(FLinearColor(0.2f, 0.85f, 0.7f, 1.0f)));
-	if (UHorizontalBoxSlot* SubSlot = MetaHBox->AddChildToHorizontalBox(CatText))
+	UTextBlock* CatBadgeText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	CatBadgeText->SetText(FText::FromString(Meta.CategoryName));
+	CatBadgeText->SetFont(FCoreStyle::GetDefaultFontStyle("Medium", 9));
+	CatBadgeText->SetColorAndOpacity(FSlateColor(FLinearColor(0.4f, 0.85f, 1.0f, 1.0f)));
+	CatBadge->SetContent(CatBadgeText);
+
+	// Статистика (протяженность, стоимость)
+	FString StatsString;
+	if (Meta.TotalLength_m > 0.0)
 	{
-		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 14.0f, 0.0f));
+		StatsString = FString::Printf(TEXT("Длина: %.0f м • Смета: %.1f млн руб."),
+			Meta.TotalLength_m, Meta.TotalCost_kRub / 1000.0);
+	}
+	else
+	{
+		StatsString = TEXT("Трассировка: готова к расчету");
 	}
 
-	UTextBlock* DateText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	DateText->SetText(FText::FromString(Meta.CreatedAt.ToString(TEXT("%d.%m.%Y %H:%M"))));
-	DateText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
-	DateText->SetColorAndOpacity(FSlateColor(FLinearColor(0.55f, 0.62f, 0.72f, 1.0f)));
-	if (UHorizontalBoxSlot* SubSlot = MetaHBox->AddChildToHorizontalBox(DateText))
+	if (Meta.bHasRoads) StatsString += TEXT(" • Автодороги");
+	if (Meta.bHasRivers) StatsString += TEXT(" • Реки");
+
+	UTextBlock* StatsText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	StatsText->SetText(FText::FromString(StatsString));
+	StatsText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
+	StatsText->SetColorAndOpacity(FSlateColor(FLinearColor(0.2f, 0.85f, 0.7f, 1.0f)));
+	if (UVerticalBoxSlot* SubSlot = InfoVBox->AddChildToVerticalBox(StatsText))
 	{
-		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 14.0f, 0.0f));
+		SubSlot->SetPadding(FMargin(0.0f, 3.0f, 0.0f, 0.0f));
 	}
 
-	if (Meta.bHasRoads)
-	{
-		UTextBlock* RoadsBadge = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-		RoadsBadge->SetText(FText::FromString(TEXT("Дороги OSM")));
-		RoadsBadge->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 9));
-		RoadsBadge->SetColorAndOpacity(FSlateColor(FLinearColor(0.4f, 0.75f, 1.0f, 0.9f)));
-		if (UHorizontalBoxSlot* SubSlot = MetaHBox->AddChildToHorizontalBox(RoadsBadge))
-		{
-			SubSlot->SetPadding(FMargin(0.0f, 0.0f, 10.0f, 0.0f));
-		}
-	}
-
-	if (Meta.bHasRivers)
-	{
-		UTextBlock* RiversBadge = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-		RiversBadge->SetText(FText::FromString(TEXT("Реки OSM")));
-		RiversBadge->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 9));
-		RiversBadge->SetColorAndOpacity(FSlateColor(FLinearColor(0.3f, 0.85f, 0.85f, 0.9f)));
-		MetaHBox->AddChildToHorizontalBox(RiversBadge);
-	}
-
-	// Правая часть карточки: кнопки действий
+	// Правая колонка карточки: Кнопки действий
 	UHorizontalBox* ActionsHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	if (UHorizontalBoxSlot* SubSlot = CardHBox->AddChildToHorizontalBox(ActionsHBox))
 	{
@@ -513,6 +657,30 @@ void URailMainMenuWidget::PopulateProjectCard(const FRailProjectMetadata& Meta, 
 	BtnSpacer->SetSize(FVector2D(8.0f, 1.0f));
 	ActionsHBox->AddChildToHorizontalBox(BtnSpacer);
 
+	// Кнопка В ОБЛАКО
+	UButton* CloudSyncBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	CloudSyncBtn->SetStyle(MakeGlassButtonStyle(
+		FLinearColor(0.06f, 0.22f, 0.36f, 0.85f),
+		FLinearColor(0.10f, 0.32f, 0.50f, 0.95f),
+		FLinearColor(0.04f, 0.16f, 0.26f, 1.0f)));
+	CloudSyncBtn->OnClicked.AddDynamic(ActionHelper, &URailProjectActionHelper::OnSyncToCloudClicked);
+	ActionsHBox->AddChildToHorizontalBox(CloudSyncBtn);
+
+	UBorder* CloudInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	CloudInner->SetBrushColor(FLinearColor::Transparent);
+	CloudInner->SetPadding(FMargin(10.0f, 8.0f));
+	CloudSyncBtn->AddChild(CloudInner);
+
+	UTextBlock* CloudText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	CloudText->SetText(FText::FromString(TEXT("☁ В облако")));
+	CloudText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
+	CloudText->SetColorAndOpacity(FSlateColor(FLinearColor(0.4f, 0.85f, 1.0f, 1.0f)));
+	CloudInner->SetContent(CloudText);
+
+	USpacer* BtnSpacer2 = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
+	BtnSpacer2->SetSize(FVector2D(8.0f, 1.0f));
+	ActionsHBox->AddChildToHorizontalBox(BtnSpacer2);
+
 	// Кнопка В ПАПКЕ
 	UButton* ExploreBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
 	ExploreBtn->SetStyle(MakeGlassButtonStyle(
@@ -532,9 +700,9 @@ void URailMainMenuWidget::PopulateProjectCard(const FRailProjectMetadata& Meta, 
 	ExpText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
 	ExpInner->SetContent(ExpText);
 
-	USpacer* BtnSpacer2 = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
-	BtnSpacer2->SetSize(FVector2D(8.0f, 1.0f));
-	ActionsHBox->AddChildToHorizontalBox(BtnSpacer2);
+	USpacer* BtnSpacer3 = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
+	BtnSpacer3->SetSize(FVector2D(8.0f, 1.0f));
+	ActionsHBox->AddChildToHorizontalBox(BtnSpacer3);
 
 	// Кнопка УДАЛИТЬ
 	UButton* DelBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
@@ -552,41 +720,215 @@ void URailMainMenuWidget::PopulateProjectCard(const FRailProjectMetadata& Meta, 
 
 	UTextBlock* DelText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	DelText->SetText(FText::FromString(TEXT("Удалить")));
-	DelText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 10));
-	DelText->SetColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.4f, 0.4f, 1.0f)));
+	DelText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
+	DelText->SetColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.45f, 0.45f, 1.0f)));
+	DelInner->SetContent(DelText);
+}
+
+void URailMainMenuWidget::PopulateCloudProjectCard(const FRailCloudProject& CloudProj, UScrollBox* TargetScrollBox)
+{
+	if (!TargetScrollBox)
+		return;
+
+	UBorder* CardBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	CardBorder->SetBrushColor(FLinearColor(0.02f, 0.045f, 0.08f, 0.90f));
+	CardBorder->SetPadding(FMargin(16.0f, 14.0f));
+
+	if (UScrollBoxSlot* CardSlot = Cast<UScrollBoxSlot>(TargetScrollBox->AddChild(CardBorder)))
+	{
+		CardSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 10.0f));
+	}
+
+	UHorizontalBox* CardHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	CardBorder->SetContent(CardHBox);
+
+	UVerticalBox* InfoVBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	if (UHorizontalBoxSlot* SubSlot = CardHBox->AddChildToHorizontalBox(InfoVBox))
+	{
+		SubSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		SubSlot->SetVerticalAlignment(VAlign_Center);
+	}
+
+	UHorizontalBox* TitleLineHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	InfoVBox->AddChildToVerticalBox(TitleLineHBox);
+
+	UTextBlock* NameText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	NameText->SetText(FText::FromString(CloudProj.Name));
+	NameText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 13));
+	NameText->SetColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.96f, 0.98f, 1.0f)));
+	TitleLineHBox->AddChildToHorizontalBox(NameText);
+
+	// Бейдж статуса проекта в облаке
+	UBorder* StatusBadge = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	FLinearColor BadgeBg = FLinearColor(0.08f, 0.22f, 0.38f, 0.85f);
+	FLinearColor BadgeFg = FLinearColor(0.35f, 0.78f, 1.0f, 1.0f);
+
+	if (CloudProj.Status == ERailCloudProjectStatus::InProgress)
+	{
+		BadgeBg = FLinearColor(0.42f, 0.24f, 0.05f, 0.85f);
+		BadgeFg = FLinearColor(1.0f, 0.75f, 0.2f, 1.0f);
+	}
+	else if (CloudProj.Status == ERailCloudProjectStatus::Completed)
+	{
+		BadgeBg = FLinearColor(0.05f, 0.32f, 0.15f, 0.85f);
+		BadgeFg = FLinearColor(0.3f, 0.95f, 0.5f, 1.0f);
+	}
+
+	StatusBadge->SetBrushColor(BadgeBg);
+	StatusBadge->SetPadding(FMargin(8.0f, 2.0f));
+	if (UHorizontalBoxSlot* SubSlot = TitleLineHBox->AddChildToHorizontalBox(StatusBadge))
+	{
+		SubSlot->SetPadding(FMargin(10.0f, 0.0f, 0.0f, 0.0f));
+		SubSlot->SetVerticalAlignment(VAlign_Center);
+	}
+
+	UTextBlock* StatusBadgeText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	StatusBadgeText->SetText(FText::FromString(CloudProj.StatusString));
+	StatusBadgeText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 9));
+	StatusBadgeText->SetColorAndOpacity(FSlateColor(BadgeFg));
+	StatusBadge->SetContent(StatusBadgeText);
+
+	// Описание и дата
+	FString Subtitle = CloudProj.Description.IsEmpty() ? TEXT("Нет описания") : CloudProj.Description;
+	if (!CloudProj.CreatedAt.IsEmpty())
+	{
+		Subtitle += FString::Printf(TEXT(" • Создан: %s"), *CloudProj.CreatedAt.Left(10));
+	}
+
+	UTextBlock* DescText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	DescText->SetText(FText::FromString(Subtitle));
+	DescText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
+	DescText->SetColorAndOpacity(FSlateColor(FLinearColor(0.65f, 0.72f, 0.82f, 1.0f)));
+	if (UVerticalBoxSlot* SubSlot = InfoVBox->AddChildToVerticalBox(DescText))
+	{
+		SubSlot->SetPadding(FMargin(0.0f, 3.0f, 0.0f, 0.0f));
+	}
+
+	// Правая колонка: кнопки действий облака
+	UHorizontalBox* ActionsHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	if (UHorizontalBoxSlot* SubSlot = CardHBox->AddChildToHorizontalBox(ActionsHBox))
+	{
+		SubSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
+		SubSlot->SetVerticalAlignment(VAlign_Center);
+	}
+
+	URailCloudProjectActionHelper* Helper = NewObject<URailCloudProjectActionHelper>(this);
+	Helper->CloudProject = CloudProj;
+	Helper->MenuWidget = this;
+	CloudActionHelpers.Add(Helper);
+
+	// Кнопка создания локальной копии
+	UButton* CloneBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	CloneBtn->SetStyle(MakeGlassButtonStyle(
+		FLinearColor(0.08f, 0.32f, 0.22f, 0.95f),
+		FLinearColor(0.12f, 0.48f, 0.32f, 1.0f),
+		FLinearColor(0.05f, 0.22f, 0.15f, 1.0f)));
+	CloneBtn->OnClicked.AddDynamic(Helper, &URailCloudProjectActionHelper::OnCreateLocalCloneClicked);
+	ActionsHBox->AddChildToHorizontalBox(CloneBtn);
+
+	UBorder* CloneInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	CloneInner->SetBrushColor(FLinearColor::Transparent);
+	CloneInner->SetPadding(FMargin(14.0f, 8.0f));
+	CloneBtn->AddChild(CloneInner);
+
+	UTextBlock* CloneText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	CloneText->SetText(FText::FromString(TEXT("ВЫБРАТЬ ДЛЯ 3D")));
+	CloneText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 10));
+	CloneText->SetColorAndOpacity(FSlateColor(FLinearColor(0.2f, 0.95f, 0.4f, 1.0f)));
+	CloneInner->SetContent(CloneText);
+
+	USpacer* Spacer = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
+	Spacer->SetSize(FVector2D(8.0f, 1.0f));
+	ActionsHBox->AddChildToHorizontalBox(Spacer);
+
+	// Кнопка удаления из облака
+	UButton* DelBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	DelBtn->SetStyle(MakeGlassButtonStyle(
+		FLinearColor(0.18f, 0.05f, 0.05f, 0.85f),
+		FLinearColor(0.32f, 0.08f, 0.08f, 0.95f),
+		FLinearColor(0.12f, 0.03f, 0.03f, 1.0f)));
+	DelBtn->OnClicked.AddDynamic(Helper, &URailCloudProjectActionHelper::OnDeleteFromCloudClicked);
+	ActionsHBox->AddChildToHorizontalBox(DelBtn);
+
+	UBorder* DelInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	DelInner->SetBrushColor(FLinearColor::Transparent);
+	DelInner->SetPadding(FMargin(10.0f, 8.0f));
+	DelBtn->AddChild(DelInner);
+
+	UTextBlock* DelText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	DelText->SetText(FText::FromString(TEXT("Удалить")));
+	DelText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
+	DelText->SetColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.45f, 0.45f, 1.0f)));
 	DelInner->SetContent(DelText);
 }
 
 void URailMainMenuWidget::RefreshProjectLibrary()
 {
-	ActionHelpers.Empty();
-
 	if (!ProjectListScrollBox)
+	{
 		return;
+	}
 
 	ProjectListScrollBox->ClearChildren();
-	TArray<FRailProjectMetadata> Projects = URailProjectManager::GetAllProjects();
+	ActionHelpers.Empty();
+	CloudActionHelpers.Empty();
 
-	if (ProjectCountText)
+	if (bShowingCloudProjects)
 	{
-		ProjectCountText->SetText(FText::FromString(FString::Printf(TEXT("Всего: %d"), Projects.Num())));
+		URailApiService* Api = URailApiService::Get(this);
+		if (!Api || !Api->IsAuthenticated())
+		{
+			UBorder* EmptyBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+			EmptyBorder->SetBrushColor(FLinearColor(0.03f, 0.06f, 0.10f, 0.8f));
+			EmptyBorder->SetPadding(FMargin(24.0f, 20.0f));
+			ProjectListScrollBox->AddChild(EmptyBorder);
+
+			UTextBlock* EmptyText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+			EmptyText->SetText(FText::FromString(TEXT("Для просмотра облачных проектов войдите в учетную запись (кнопка 'Облако / Вход' вверху).")));
+			EmptyText->SetFont(FCoreStyle::GetDefaultFontStyle("Medium", 11));
+			EmptyText->SetColorAndOpacity(FSlateColor(FLinearColor(0.7f, 0.78f, 0.88f, 1.0f)));
+			EmptyBorder->SetContent(EmptyText);
+
+			if (ProjectCountText) ProjectCountText->SetText(FText::FromString(TEXT("Не авторизован")));
+			return;
+		}
+
+		if (Api->CachedCloudProjects.Num() == 0)
+		{
+			Api->FetchProjects(0, 50);
+		}
+		else
+		{
+			for (const FRailCloudProject& CloudProj : Api->CachedCloudProjects)
+			{
+				PopulateCloudProjectCard(CloudProj, ProjectListScrollBox);
+			}
+			if (ProjectCountText)
+			{
+				ProjectCountText->SetText(FText::FromString(FString::Printf(TEXT("В облаке: %d"), Api->CachedCloudProjects.Num())));
+			}
+		}
 	}
-
-	if (Projects.Num() == 0)
+	else
 	{
-		UTextBlock* EmptyText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-		EmptyText->SetText(FText::FromString(TEXT("В библиотеке пока нет проектов. Нажмите '+ СОЗДАТЬ НОВЫЙ ПРОЕКТ' для начала.")));
-		EmptyText->SetFont(FCoreStyle::GetDefaultFontStyle("Italic", 12));
-		EmptyText->SetColorAndOpacity(FSlateColor(FLinearColor(0.55f, 0.62f, 0.72f, 1.0f)));
-		ProjectListScrollBox->AddChild(EmptyText);
-		return;
-	}
+		URailProjectManager::EnsureProjectsDirectoryExists();
+		TArray<FRailProjectMetadata> Projects = URailProjectManager::GetAllProjects();
 
-	for (const FRailProjectMetadata& Meta : Projects)
-	{
-		PopulateProjectCard(Meta, ProjectListScrollBox);
+		for (const FRailProjectMetadata& Proj : Projects)
+		{
+			PopulateProjectCard(Proj, ProjectListScrollBox);
+		}
+
+		if (ProjectCountText)
+		{
+			ProjectCountText->SetText(FText::FromString(FString::Printf(TEXT("Всего: %d"), Projects.Num())));
+		}
 	}
 }
+
+// ─────────────────────────────────────────────────────────────────
+//  Модальные окна
+// ─────────────────────────────────────────────────────────────────
 
 void URailMainMenuWidget::BuildCreateProjectModal(UCanvasPanel* RootCanvas)
 {
@@ -598,7 +940,6 @@ void URailMainMenuWidget::BuildCreateProjectModal(UCanvasPanel* RootCanvas)
 	ModalSlot->SetAnchors(FAnchors(0.0f, 0.0f, 1.0f, 1.0f));
 	ModalSlot->SetOffsets(FMargin(0.0f));
 
-	// Карточка по центру экрана с ограничением ширины и высоты (адаптивность под любой экран)
 	USizeBox* ModalSizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
 	ModalSizeBox->SetWidthOverride(540.0f);
 	ModalSizeBox->SetMaxDesiredHeight(680.0f);
@@ -608,7 +949,6 @@ void URailMainMenuWidget::BuildCreateProjectModal(UCanvasPanel* RootCanvas)
 	DialogCard->SetPadding(FMargin(28.0f, 20.0f));
 	ModalSizeBox->SetContent(DialogCard);
 
-	// Центрирование через CanvasPanel внутри полноэкранного затемнения
 	UCanvasPanel* ModalCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
 	CreateProjectModalBorder->SetContent(ModalCanvas);
 
@@ -624,7 +964,6 @@ void URailMainMenuWidget::BuildCreateProjectModal(UCanvasPanel* RootCanvas)
 	UVerticalBox* VBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
 	ModalScroll->AddChild(VBox);
 
-	// Заголовок
 	UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	Title->SetText(FText::FromString(TEXT("СОЗДАНИЕ НОВОГО ПРОЕКТА")));
 	Title->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 16));
@@ -643,63 +982,39 @@ void URailMainMenuWidget::BuildCreateProjectModal(UCanvasPanel* RootCanvas)
 
 	ProjectNameInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
 	ProjectNameInput->SetText(FText::FromString(TEXT("Участок трассы 1")));
-	ProjectNameInput->SetHintText(FText::FromString(TEXT("Введите название проекта...")));
 	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(ProjectNameInput))
 	{
 		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 12.0f));
 	}
 
-	// Поле 2: Категория дороги
+	// Поле 2: Категория железной дороги
 	UTextBlock* CatLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	CatLabel->SetText(FText::FromString(TEXT("Категория железнодорожной линии (СП 119.13330):")));
+	CatLabel->SetText(FText::FromString(TEXT("Категория дороги (СП 119.13330):")));
 	CatLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
 	CatLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
 	VBox->AddChildToVerticalBox(CatLabel);
 
 	CategoryComboBox = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass());
-
-	// Стилизация выпадающего списка: темный фон, белый читаемый текст пунктов
-	FTableRowStyle ItemStyle = CategoryComboBox->GetItemStyle();
-	ItemStyle.TextColor = FSlateColor(FLinearColor(0.92f, 0.95f, 0.98f, 1.0f));
-	ItemStyle.SelectedTextColor = FSlateColor(FLinearColor::White);
-	ItemStyle.EvenRowBackgroundBrush.TintColor = FSlateColor(FLinearColor(0.04f, 0.07f, 0.12f, 0.98f));
-	ItemStyle.OddRowBackgroundBrush.TintColor = FSlateColor(FLinearColor(0.03f, 0.05f, 0.09f, 0.98f));
-	ItemStyle.ActiveBrush.TintColor = FSlateColor(FLinearColor(0.08f, 0.38f, 0.68f, 1.0f));
-	ItemStyle.ActiveHoveredBrush.TintColor = FSlateColor(FLinearColor(0.12f, 0.48f, 0.82f, 1.0f));
-	ItemStyle.EvenRowBackgroundHoveredBrush.TintColor = FSlateColor(FLinearColor(0.08f, 0.16f, 0.28f, 1.0f));
-	ItemStyle.OddRowBackgroundHoveredBrush.TintColor = FSlateColor(FLinearColor(0.08f, 0.16f, 0.28f, 1.0f));
-	CategoryComboBox->SetItemStyle(ItemStyle);
-
-	FComboBoxStyle WidgetStyle = CategoryComboBox->GetWidgetStyle();
-	WidgetStyle.ComboButtonStyle.ButtonStyle.Normal.TintColor = FSlateColor(FLinearColor(0.04f, 0.08f, 0.15f, 0.95f));
-	WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.TintColor = FSlateColor(FLinearColor(0.07f, 0.14f, 0.25f, 1.0f));
-	WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.TintColor = FSlateColor(FLinearColor(0.02f, 0.05f, 0.10f, 1.0f));
-	WidgetStyle.ComboButtonStyle.MenuBorderBrush.TintColor = FSlateColor(FLinearColor(0.02f, 0.04f, 0.08f, 0.98f));
-	WidgetStyle.ComboButtonStyle.DownArrowImage.TintColor = FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f));
-	CategoryComboBox->SetWidgetStyle(WidgetStyle);
-
-	CategoryComboBox->OnGenerateWidgetEvent.BindDynamic(this, &URailMainMenuWidget::HandleGenerateCategoryWidget);
-
-	CategoryComboBox->AddOption(TEXT("I Категория"));
+	CategoryComboBox->AddOption(TEXT("Скоростная (до 250 км/ч)"));
+	CategoryComboBox->AddOption(TEXT("Особогрузонапряженная"));
+	CategoryComboBox->AddOption(TEXT("I Категория (Магистральная)"));
 	CategoryComboBox->AddOption(TEXT("II Категория"));
 	CategoryComboBox->AddOption(TEXT("III Категория"));
-	CategoryComboBox->AddOption(TEXT("IV (Железнодорожные линии)"));
-	CategoryComboBox->AddOption(TEXT("IV (Подъездные пути)"));
-	CategoryComboBox->AddOption(TEXT("Скоростные"));
-	CategoryComboBox->AddOption(TEXT("Пассажирские"));
-	CategoryComboBox->AddOption(TEXT("Особогрузонапряженные"));
-	CategoryComboBox->SetSelectedOption(TEXT("I Категория"));
+	CategoryComboBox->AddOption(TEXT("IV Категория"));
+	CategoryComboBox->SetSelectedIndex(2);
+	CategoryComboBox->OnGenerateWidgetEvent.BindDynamic(this, &URailMainMenuWidget::HandleGenerateCategoryWidget);
+
 	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(CategoryComboBox))
 	{
-		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 12.0f));
+		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 14.0f));
 	}
 
-	// Поле 3: Тип источника рельефа
-	UTextBlock* TypeLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	TypeLabel->SetText(FText::FromString(TEXT("Формат карты высот:")));
-	TypeLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
-	TypeLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
-	VBox->AddChildToVerticalBox(TypeLabel);
+	// Переключатель типа источника данных
+	UTextBlock* SourceTypeLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	SourceTypeLabel->SetText(FText::FromString(TEXT("Тип карты высот рельефа:")));
+	SourceTypeLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	SourceTypeLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
+	VBox->AddChildToVerticalBox(SourceTypeLabel);
 
 	UHorizontalBox* TypeHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(TypeHBox))
@@ -708,172 +1023,219 @@ void URailMainMenuWidget::BuildCreateProjectModal(UCanvasPanel* RootCanvas)
 	}
 
 	PngTypeButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-	PngTypeButton->SetStyle(MakeGlassButtonStyle(
-		FLinearColor(0.08f, 0.28f, 0.45f, 0.95f),
-		FLinearColor(0.12f, 0.38f, 0.60f, 1.0f),
-		FLinearColor(0.05f, 0.20f, 0.35f, 1.0f)));
+	PngTypeButton->SetStyle(MakeGlassButtonStyle(FLinearColor(0.08f, 0.32f, 0.52f, 0.95f), FLinearColor(0.12f, 0.42f, 0.65f, 1.0f), FLinearColor(0.06f, 0.24f, 0.40f, 1.0f)));
 	PngTypeButton->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleSourceTypeToggledPng);
-	TypeHBox->AddChildToHorizontalBox(PngTypeButton);
+	if (UHorizontalBoxSlot* HSlot = TypeHBox->AddChildToHorizontalBox(PngTypeButton))
+	{
+		HSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		HSlot->SetPadding(FMargin(0.0f, 0.0f, 4.0f, 0.0f));
+	}
 
 	PngTypeText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	PngTypeText->SetText(FText::FromString(TEXT("●  16-бит PNG (готовый)")));
-	PngTypeText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	PngTypeText->SetText(FText::FromString(TEXT("16-битный PNG (готовая карта)")));
+	PngTypeText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 10));
 	PngTypeText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
-	UBorder* PngInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
-	PngInner->SetBrushColor(FLinearColor::Transparent);
-	PngInner->SetPadding(FMargin(14.0f, 8.0f));
-	PngInner->SetContent(PngTypeText);
-	PngTypeButton->AddChild(PngInner);
-
-	USpacer* TypeSpacer = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
-	TypeSpacer->SetSize(FVector2D(12.0f, 1.0f));
-	TypeHBox->AddChildToHorizontalBox(TypeSpacer);
+	PngTypeText->SetJustification(ETextJustify::Center);
+	PngTypeButton->SetContent(PngTypeText);
 
 	TifTypeButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-	TifTypeButton->SetStyle(MakeGlassButtonStyle(
-		FLinearColor(0.04f, 0.07f, 0.12f, 0.85f),
-		FLinearColor(0.08f, 0.15f, 0.25f, 0.95f),
-		FLinearColor(0.02f, 0.05f, 0.09f, 1.0f)));
+	TifTypeButton->SetStyle(MakeGlassButtonStyle(FLinearColor(0.05f, 0.08f, 0.14f, 0.85f), FLinearColor(0.09f, 0.15f, 0.24f, 0.95f), FLinearColor(0.03f, 0.06f, 0.10f, 1.0f)));
 	TifTypeButton->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleSourceTypeToggledTif);
-	TypeHBox->AddChildToHorizontalBox(TifTypeButton);
+	if (UHorizontalBoxSlot* HSlot = TypeHBox->AddChildToHorizontalBox(TifTypeButton))
+	{
+		HSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		HSlot->SetPadding(FMargin(4.0f, 0.0f, 0.0f, 0.0f));
+	}
 
 	TifTypeText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	TifTypeText->SetText(FText::FromString(TEXT("○  GeoTIFF DEM (.tif)")));
-	TifTypeText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
-	TifTypeText->SetColorAndOpacity(FSlateColor(FLinearColor(0.65f, 0.72f, 0.82f, 1.0f)));
-	UBorder* TifInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
-	TifInner->SetBrushColor(FLinearColor::Transparent);
-	TifInner->SetPadding(FMargin(14.0f, 8.0f));
-	TifInner->SetContent(TifTypeText);
-	TifTypeButton->AddChild(TifInner);
+	TifTypeText->SetText(FText::FromString(TEXT("GeoTIFF (.tif спутниковый)")));
+	TifTypeText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
+	TifTypeText->SetColorAndOpacity(FSlateColor(FLinearColor(0.6f, 0.68f, 0.78f, 1.0f)));
+	TifTypeText->SetJustification(ETextJustify::Center);
+	TifTypeButton->SetContent(TifTypeText);
 
-	// Поле 4: Путь к файлу
-	UTextBlock* FileLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	FileLabel->SetText(FText::FromString(TEXT("Путь к исходному файлу рельефа:")));
-	FileLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
-	FileLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
-	VBox->AddChildToVerticalBox(FileLabel);
-
+	// Путь к файлу с кнопкой Обзор
 	UHorizontalBox* FileHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(FileHBox))
+	{
+		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
+	}
+
+	FilePathInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
+	FilePathInput->SetHintText(FText::FromString(TEXT("Выберите файл карты высот...")));
+	if (UHorizontalBoxSlot* HSlot = FileHBox->AddChildToHorizontalBox(FilePathInput))
+	{
+		HSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		HSlot->SetPadding(FMargin(0.0f, 0.0f, 8.0f, 0.0f));
+	}
+
+	UButton* BrowseBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	BrowseBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.12f, 0.18f, 0.28f, 0.9f), FLinearColor(0.18f, 0.26f, 0.38f, 1.0f), FLinearColor(0.08f, 0.12f, 0.20f, 1.0f)));
+	BrowseBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleBrowseFileClicked);
+	FileHBox->AddChildToHorizontalBox(BrowseBtn);
+
+	UTextBlock* BrowseText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	BrowseText->SetText(FText::FromString(TEXT("Обзор...")));
+	BrowseText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 10));
+	BrowseText->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.98f, 1.0f)));
+	BrowseBtn->SetContent(BrowseText);
+
+	// Чекбоксы слоев
+	RoadsCheckBox = WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass());
+	RoadsCheckBox->SetIsChecked(true);
+
+	UHorizontalBox* RoadsHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	RoadsHBox->AddChildToHorizontalBox(RoadsCheckBox);
+
+	UTextBlock* RoadsLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	RoadsLabel->SetText(FText::FromString(TEXT(" Загрузить автодорожную сеть (OSM)")));
+	RoadsLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
+	RoadsLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.88f, 0.94f, 1.0f)));
+	RoadsHBox->AddChildToHorizontalBox(RoadsLabel);
+	VBox->AddChildToVerticalBox(RoadsHBox);
+
+	RiversCheckBox = WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass());
+	RiversCheckBox->SetIsChecked(true);
+
+	UHorizontalBox* RiversHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	RiversHBox->AddChildToHorizontalBox(RiversCheckBox);
+
+	UTextBlock* RiversLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	RiversLabel->SetText(FText::FromString(TEXT(" Загрузить реки и водоемы (OSM)")));
+	RiversLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
+	RiversLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.88f, 0.94f, 1.0f)));
+	RiversHBox->AddChildToHorizontalBox(RiversLabel);
+	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(RiversHBox))
+	{
+		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 16.0f));
+	}
+
+	// Кнопки Создать / Отмена
+	UHorizontalBox* ModalBtnsHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	VBox->AddChildToVerticalBox(ModalBtnsHBox);
+
+	UButton* ConfirmBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	ConfirmBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.08f, 0.38f, 0.22f, 0.95f), FLinearColor(0.12f, 0.50f, 0.30f, 1.0f), FLinearColor(0.05f, 0.26f, 0.15f, 1.0f)));
+	ConfirmBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleCreateProjectConfirmClicked);
+	if (UHorizontalBoxSlot* HSlot = ModalBtnsHBox->AddChildToHorizontalBox(ConfirmBtn))
+	{
+		HSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		HSlot->SetPadding(FMargin(0.0f, 0.0f, 8.0f, 0.0f));
+	}
+
+	UTextBlock* ConfirmText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	ConfirmText->SetText(FText::FromString(TEXT("СОЗДАТЬ И ЗАПУСТИТЬ")));
+	ConfirmText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	ConfirmText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	ConfirmText->SetJustification(ETextJustify::Center);
+	ConfirmBtn->SetContent(ConfirmText);
+
+	UButton* CancelBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	CancelBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.18f, 0.22f, 0.28f, 0.9f), FLinearColor(0.25f, 0.30f, 0.38f, 1.0f), FLinearColor(0.12f, 0.15f, 0.20f, 1.0f)));
+	CancelBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleCreateProjectCancelClicked);
+	ModalBtnsHBox->AddChildToHorizontalBox(CancelBtn);
+
+	UTextBlock* CancelText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	CancelText->SetText(FText::FromString(TEXT("Отмена")));
+	CancelText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
+	CancelText->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.88f, 0.94f, 1.0f)));
+	CancelBtn->SetContent(CancelText);
+}
+
+void URailMainMenuWidget::BuildCreateCloudProjectModal(UCanvasPanel* RootCanvas)
+{
+	CreateCloudModalBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("CreateCloudModalBorder"));
+	CreateCloudModalBorder->SetBrushColor(FLinearColor(0.01f, 0.015f, 0.03f, 0.85f));
+	CreateCloudModalBorder->SetVisibility(ESlateVisibility::Collapsed);
+
+	UCanvasPanelSlot* ModalSlot = RootCanvas->AddChildToCanvas(CreateCloudModalBorder);
+	ModalSlot->SetAnchors(FAnchors(0.0f, 0.0f, 1.0f, 1.0f));
+	ModalSlot->SetOffsets(FMargin(0.0f));
+
+	USizeBox* ModalSizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
+	ModalSizeBox->SetWidthOverride(480.0f);
+
+	UBorder* DialogCard = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
+	DialogCard->SetBrushColor(FLinearColor(0.02f, 0.035f, 0.065f, 0.98f));
+	DialogCard->SetPadding(FMargin(26.0f, 20.0f));
+	ModalSizeBox->SetContent(DialogCard);
+
+	UCanvasPanel* ModalCanvas = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
+	CreateCloudModalBorder->SetContent(ModalCanvas);
+
+	UCanvasPanelSlot* CardSlot = ModalCanvas->AddChildToCanvas(ModalSizeBox);
+	CardSlot->SetAnchors(FAnchors(0.5f, 0.5f, 0.5f, 0.5f));
+	CardSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+	CardSlot->SetPosition(FVector2D(0.0f, 0.0f));
+	CardSlot->SetAutoSize(true);
+
+	UVerticalBox* VBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	DialogCard->SetContent(VBox);
+
+	UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	Title->SetText(FText::FromString(TEXT("СОЗДАНИЕ ПРОЕКТА В ОБЛАКЕ (REST API)")));
+	Title->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 14));
+	Title->SetColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f)));
+	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(Title))
+	{
+		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 14.0f));
+	}
+
+	UTextBlock* NameLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	NameLabel->SetText(FText::FromString(TEXT("Название проекта в облаке:")));
+	NameLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	NameLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
+	VBox->AddChildToVerticalBox(NameLabel);
+
+	CloudProjNameInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
+	CloudProjNameInput->SetText(FText::FromString(TEXT("Северный железнодорожный коридор")));
+	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(CloudProjNameInput))
 	{
 		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 12.0f));
 	}
 
-	FilePathInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
-	FilePathInput->SetHintText(FText::FromString(TEXT("Выберите файл карты высот (.png или .tif)...")));
-	if (UHorizontalBoxSlot* SubSlot = FileHBox->AddChildToHorizontalBox(FilePathInput))
+	UTextBlock* DescLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	DescLabel->SetText(FText::FromString(TEXT("Описание проекта (до 500 символов):")));
+	DescLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	DescLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
+	VBox->AddChildToVerticalBox(DescLabel);
+
+	CloudProjDescInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
+	CloudProjDescInput->SetText(FText::FromString(TEXT("Предварительное технико-экономическое обоснование трассы")));
+	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(CloudProjDescInput))
 	{
-		SubSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 18.0f));
 	}
 
-	USpacer* FileSpacer = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
-	FileSpacer->SetSize(FVector2D(8.0f, 1.0f));
-	FileHBox->AddChildToHorizontalBox(FileSpacer);
-
-	UButton* BrowseBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-	BrowseBtn->SetStyle(MakeGlassButtonStyle(
-		FLinearColor(0.06f, 0.14f, 0.24f, 0.9f),
-		FLinearColor(0.10f, 0.24f, 0.40f, 1.0f),
-		FLinearColor(0.04f, 0.10f, 0.18f, 1.0f)));
-	BrowseBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleBrowseFileClicked);
-	FileHBox->AddChildToHorizontalBox(BrowseBtn);
-
-	UBorder* BrowseInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
-	BrowseInner->SetBrushColor(FLinearColor::Transparent);
-	BrowseInner->SetPadding(FMargin(14.0f, 8.0f));
-	BrowseBtn->AddChild(BrowseInner);
-
-	UTextBlock* BrowseText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	BrowseText->SetText(FText::FromString(TEXT("Обзор...")));
-	BrowseText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
-	BrowseText->SetColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f)));
-	BrowseInner->SetContent(BrowseText);
-
-	// Поле 5: Плашки загрузки векторных слоев
-	UHorizontalBox* CheckHBox1 = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	RoadsCheckBox = WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass());
-	RoadsCheckBox->SetIsChecked(true);
-	CheckHBox1->AddChildToHorizontalBox(RoadsCheckBox);
-
-	UTextBlock* RoadsLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	RoadsLabel->SetText(FText::FromString(TEXT("  Загрузить дороги (автотрассы, развязки)")));
-	RoadsLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
-	RoadsLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
-	CheckHBox1->AddChildToHorizontalBox(RoadsLabel);
-	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(CheckHBox1))
-	{
-		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 4.0f));
-	}
-
-	UHorizontalBox* CheckHBox2 = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	RiversCheckBox = WidgetTree->ConstructWidget<UCheckBox>(UCheckBox::StaticClass());
-	RiversCheckBox->SetIsChecked(true);
-	CheckHBox2->AddChildToHorizontalBox(RiversCheckBox);
-
-	UTextBlock* RiversLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	RiversLabel->SetText(FText::FromString(TEXT("  Загрузить реки (гидрографию)")));
-	RiversLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
-	RiversLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
-	CheckHBox2->AddChildToHorizontalBox(RiversLabel);
-	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(CheckHBox2))
-	{
-		SubSlot->SetPadding(FMargin(0.0f, 2.0f, 0.0f, 18.0f));
-	}
-
-	// Кнопки подтверждения и отмены
-	UHorizontalBox* BtnHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
-	VBox->AddChildToVerticalBox(BtnHBox);
+	UHorizontalBox* BtnsHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	VBox->AddChildToVerticalBox(BtnsHBox);
 
 	UButton* ConfirmBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-	ConfirmBtn->SetStyle(MakeGlassButtonStyle(
-		FLinearColor(0.06f, 0.32f, 0.20f, 0.95f),
-		FLinearColor(0.10f, 0.48f, 0.30f, 1.0f),
-		FLinearColor(0.04f, 0.22f, 0.14f, 1.0f)));
-	ConfirmBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleCreateProjectConfirmClicked);
-	if (UHorizontalBoxSlot* SubSlot = BtnHBox->AddChildToHorizontalBox(ConfirmBtn))
+	ConfirmBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.08f, 0.38f, 0.22f, 0.95f), FLinearColor(0.12f, 0.50f, 0.30f, 1.0f), FLinearColor(0.05f, 0.26f, 0.15f, 1.0f)));
+	ConfirmBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleCreateCloudConfirmClicked);
+	if (UHorizontalBoxSlot* HSlot = BtnsHBox->AddChildToHorizontalBox(ConfirmBtn))
 	{
-		SubSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		HSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		HSlot->SetPadding(FMargin(0.0f, 0.0f, 8.0f, 0.0f));
 	}
 
-	UBorder* ConfInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
-	ConfInner->SetBrushColor(FLinearColor::Transparent);
-	ConfInner->SetPadding(FMargin(16.0f, 10.0f));
-	ConfirmBtn->AddChild(ConfInner);
-
-	UTextBlock* ConfText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	ConfText->SetText(FText::FromString(TEXT("СОЗДАТЬ И ОТКРЫТЬ")));
-	ConfText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 12));
-	ConfText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
-	ConfText->SetJustification(ETextJustify::Center);
-	ConfInner->SetContent(ConfText);
-
-	USpacer* ModalBtnSpacer = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
-	ModalBtnSpacer->SetSize(FVector2D(12.0f, 1.0f));
-	BtnHBox->AddChildToHorizontalBox(ModalBtnSpacer);
+	UTextBlock* ConfirmText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	ConfirmText->SetText(FText::FromString(TEXT("Создать в базе API")));
+	ConfirmText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	ConfirmText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	ConfirmText->SetJustification(ETextJustify::Center);
+	ConfirmBtn->SetContent(ConfirmText);
 
 	UButton* CancelBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
-	CancelBtn->SetStyle(MakeGlassButtonStyle(
-		FLinearColor(0.06f, 0.08f, 0.12f, 0.85f),
-		FLinearColor(0.12f, 0.16f, 0.22f, 0.95f),
-		FLinearColor(0.03f, 0.04f, 0.08f, 1.0f)));
-	CancelBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleCreateProjectCancelClicked);
-	if (UHorizontalBoxSlot* SubSlot = BtnHBox->AddChildToHorizontalBox(CancelBtn))
-	{
-		SubSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-	}
+	CancelBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.18f, 0.22f, 0.28f, 0.9f), FLinearColor(0.25f, 0.30f, 0.38f, 1.0f), FLinearColor(0.12f, 0.15f, 0.20f, 1.0f)));
+	CancelBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleCreateCloudCancelClicked);
+	BtnsHBox->AddChildToHorizontalBox(CancelBtn);
 
-	UBorder* CancInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
-	CancInner->SetBrushColor(FLinearColor::Transparent);
-	CancInner->SetPadding(FMargin(16.0f, 10.0f));
-	CancelBtn->AddChild(CancInner);
-
-	UTextBlock* CancText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	CancText->SetText(FText::FromString(TEXT("ОТМЕНА")));
-	CancText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 12));
-	CancText->SetColorAndOpacity(FSlateColor(FLinearColor(0.7f, 0.75f, 0.85f, 1.0f)));
-	CancText->SetJustification(ETextJustify::Center);
-	CancInner->SetContent(CancText);
+	UTextBlock* CancelText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	CancelText->SetText(FText::FromString(TEXT("Отмена")));
+	CancelText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
+	CancelText->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.88f, 0.94f, 1.0f)));
+	CancelBtn->SetContent(CancelText);
 }
 
 void URailMainMenuWidget::BuildAuthModal(UCanvasPanel* RootCanvas)
@@ -887,7 +1249,8 @@ void URailMainMenuWidget::BuildAuthModal(UCanvasPanel* RootCanvas)
 	ModalSlot->SetOffsets(FMargin(0.0f));
 
 	USizeBox* ModalSizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	ModalSizeBox->SetWidthOverride(460.0f);
+	ModalSizeBox->SetWidthOverride(480.0f);
+	ModalSizeBox->SetMaxDesiredHeight(680.0f);
 
 	UBorder* DialogCard = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
 	DialogCard->SetBrushColor(FLinearColor(0.02f, 0.035f, 0.065f, 0.98f));
@@ -903,61 +1266,103 @@ void URailMainMenuWidget::BuildAuthModal(UCanvasPanel* RootCanvas)
 	CardSlot->SetPosition(FVector2D(0.0f, 0.0f));
 	CardSlot->SetAutoSize(true);
 
-	UVerticalBox* VBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	DialogCard->SetContent(VBox);
+	UScrollBox* ModalScroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass());
+	DialogCard->SetContent(ModalScroll);
 
-	UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	Title->SetText(FText::FromString(TEXT("ОБЛАЧНАЯ АВТОРИЗАЦИЯ")));
-	Title->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 15));
-	Title->SetColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f)));
-	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(Title))
+	UVerticalBox* VBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
+	ModalScroll->AddChild(VBox);
+
+	AuthTitleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	AuthTitleText->SetText(FText::FromString(TEXT("ОБЛАЧНАЯ АВТОРИЗАЦИЯ (JWT)")));
+	AuthTitleText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 15));
+	AuthTitleText->SetColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f)));
+	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(AuthTitleText))
+	{
+		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 10.0f));
+	}
+
+	// Переключатель режима: Вход / Регистрация
+	UHorizontalBox* ModeHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(ModeHBox))
 	{
 		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 12.0f));
 	}
 
-	UBorder* InfoCard = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
-	InfoCard->SetBrushColor(FLinearColor(0.03f, 0.06f, 0.10f, 0.8f));
-	InfoCard->SetPadding(FMargin(12.0f, 10.0f));
-	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(InfoCard))
+	AuthTabLoginBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	AuthTabLoginBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.08f, 0.32f, 0.52f, 0.95f), FLinearColor(0.12f, 0.42f, 0.65f, 1.0f), FLinearColor(0.06f, 0.24f, 0.40f, 1.0f)));
+	AuthTabLoginBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleAuthModeLoginClicked);
+	if (UHorizontalBoxSlot* HSlot = ModeHBox->AddChildToHorizontalBox(AuthTabLoginBtn))
 	{
-		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 14.0f));
+		HSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		HSlot->SetPadding(FMargin(0.0f, 0.0f, 4.0f, 0.0f));
 	}
 
-	UTextBlock* InfoText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	InfoText->SetText(FText::FromString(TEXT("Авторизуйтесь для синхронизации проектов с облаком и быстрого импорта зон рельефа OpenTopography из личного кабинета.")));
-	InfoText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
-	InfoText->SetAutoWrapText(true);
-	InfoText->SetWrapTextAt(400.0f);
-	InfoText->SetColorAndOpacity(FSlateColor(FLinearColor(0.7f, 0.78f, 0.88f, 1.0f)));
-	InfoCard->SetContent(InfoText);
+	AuthTabLoginText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	AuthTabLoginText->SetText(FText::FromString(TEXT("Вход в аккаунт")));
+	AuthTabLoginText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	AuthTabLoginText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	AuthTabLoginText->SetJustification(ETextJustify::Center);
+	AuthTabLoginBtn->SetContent(AuthTabLoginText);
 
+	AuthTabRegisterBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	AuthTabRegisterBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.05f, 0.08f, 0.14f, 0.85f), FLinearColor(0.09f, 0.15f, 0.24f, 0.95f), FLinearColor(0.03f, 0.06f, 0.10f, 1.0f)));
+	AuthTabRegisterBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleAuthModeRegisterClicked);
+	if (UHorizontalBoxSlot* HSlot = ModeHBox->AddChildToHorizontalBox(AuthTabRegisterBtn))
+	{
+		HSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		HSlot->SetPadding(FMargin(4.0f, 0.0f, 0.0f, 0.0f));
+	}
+
+	AuthTabRegisterText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	AuthTabRegisterText->SetText(FText::FromString(TEXT("Регистрация")));
+	AuthTabRegisterText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
+	AuthTabRegisterText->SetColorAndOpacity(FSlateColor(FLinearColor(0.7f, 0.75f, 0.85f, 1.0f)));
+	AuthTabRegisterText->SetJustification(ETextJustify::Center);
+	AuthTabRegisterBtn->SetContent(AuthTabRegisterText);
+
+	URailApiService* Api = URailApiService::Get(this);
+
+	// Поле Email
 	UTextBlock* EmailLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	EmailLabel->SetText(FText::FromString(TEXT("Email пользователя:")));
-	EmailLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	EmailLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 10));
 	EmailLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
 	VBox->AddChildToVerticalBox(EmailLabel);
 
 	AuthEmailInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
-	AuthEmailInput->SetText(FText::FromString(TEXT("engineer@railoptima.ru")));
+	AuthEmailInput->SetText(FText::FromString(Api && Api->IsAuthenticated() ? Api->GetAuthData().Email : TEXT("user@example.com")));
 	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(AuthEmailInput))
 	{
-		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 12.0f));
+		SubSlot->SetPadding(FMargin(0.0f, 3.0f, 0.0f, 10.0f));
 	}
 
+	// Поле пароля
 	UTextBlock* PassLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
 	PassLabel->SetText(FText::FromString(TEXT("Пароль:")));
-	PassLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	PassLabel->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 10));
 	PassLabel->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.90f, 0.96f, 1.0f)));
 	VBox->AddChildToVerticalBox(PassLabel);
 
 	AuthPassInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
 	AuthPassInput->SetIsPassword(true);
-	AuthPassInput->SetText(FText::FromString(TEXT("••••••••••••")));
+	AuthPassInput->SetText(FText::FromString(TEXT("secure-password")));
 	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(AuthPassInput))
 	{
-		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 16.0f));
+		SubSlot->SetPadding(FMargin(0.0f, 3.0f, 0.0f, 12.0f));
 	}
 
+	// Сообщение о статусе
+	AuthStatusMessage = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	AuthStatusMessage->SetText(FText::GetEmpty());
+	AuthStatusMessage->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
+	AuthStatusMessage->SetColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.7f, 0.2f, 1.0f)));
+	AuthStatusMessage->SetAutoWrapText(true);
+	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(AuthStatusMessage))
+	{
+		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 10.0f));
+	}
+
+	// Кнопки отправки / закрытия
 	UHorizontalBox* BtnHBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
 	VBox->AddChildToVerticalBox(BtnHBox);
 
@@ -970,95 +1375,83 @@ void URailMainMenuWidget::BuildAuthModal(UCanvasPanel* RootCanvas)
 	if (UHorizontalBoxSlot* SubSlot = BtnHBox->AddChildToHorizontalBox(LoginBtn))
 	{
 		SubSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 8.0f, 0.0f));
 	}
 
-	UBorder* LogInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
-	LogInner->SetBrushColor(FLinearColor::Transparent);
-	LogInner->SetPadding(FMargin(16.0f, 10.0f));
-	LoginBtn->AddChild(LogInner);
-
-	UTextBlock* LogText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	LogText->SetText(FText::FromString(TEXT("ВОЙТИ В ОБЛАКО")));
-	LogText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 12));
-	LogText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
-	LogText->SetJustification(ETextJustify::Center);
-	LogInner->SetContent(LogText);
-
-	USpacer* Spacer = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
-	Spacer->SetSize(FVector2D(12.0f, 1.0f));
-	BtnHBox->AddChildToHorizontalBox(Spacer);
+	AuthSubmitText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	AuthSubmitText->SetText(FText::FromString(TEXT("ВОЙТИ В ОБЛАКО")));
+	AuthSubmitText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	AuthSubmitText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	AuthSubmitText->SetJustification(ETextJustify::Center);
+	LoginBtn->SetContent(AuthSubmitText);
 
 	UButton* CloseBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
 	CloseBtn->SetStyle(MakeGlassButtonStyle(
-		FLinearColor(0.06f, 0.08f, 0.12f, 0.85f),
-		FLinearColor(0.12f, 0.16f, 0.22f, 0.95f),
-		FLinearColor(0.03f, 0.04f, 0.08f, 1.0f)));
+		FLinearColor(0.12f, 0.16f, 0.22f, 0.85f),
+		FLinearColor(0.18f, 0.22f, 0.30f, 0.95f),
+		FLinearColor(0.08f, 0.10f, 0.15f, 1.0f)));
 	CloseBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleAuthCloseClicked);
-	if (UHorizontalBoxSlot* SubSlot = BtnHBox->AddChildToHorizontalBox(CloseBtn))
-	{
-		SubSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-	}
-
-	UBorder* CloseInner = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
-	CloseInner->SetBrushColor(FLinearColor::Transparent);
-	CloseInner->SetPadding(FMargin(16.0f, 10.0f));
-	CloseBtn->AddChild(CloseInner);
+	BtnHBox->AddChildToHorizontalBox(CloseBtn);
 
 	UTextBlock* CloseText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	CloseText->SetText(FText::FromString(TEXT("ЗАКРЫТЬ")));
-	CloseText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 12));
-	CloseText->SetColorAndOpacity(FSlateColor(FLinearColor(0.7f, 0.75f, 0.85f, 1.0f)));
-	CloseText->SetJustification(ETextJustify::Center);
-	CloseInner->SetContent(CloseText);
+	CloseText->SetText(FText::FromString(TEXT("Закрыть")));
+	CloseText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
+	CloseText->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.88f, 0.92f, 1.0f)));
+	CloseBtn->SetContent(CloseText);
+
+	// Кнопка Выйти из аккаунта (если авторизован)
+	AuthLogoutBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass());
+	AuthLogoutBtn->SetStyle(MakeGlassButtonStyle(
+		FLinearColor(0.25f, 0.08f, 0.08f, 0.85f),
+		FLinearColor(0.38f, 0.12f, 0.12f, 0.95f),
+		FLinearColor(0.15f, 0.05f, 0.05f, 1.0f)));
+	AuthLogoutBtn->OnClicked.AddDynamic(this, &URailMainMenuWidget::HandleAuthLogoutClicked);
+	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(AuthLogoutBtn))
+	{
+		SubSlot->SetPadding(FMargin(0.0f, 12.0f, 0.0f, 0.0f));
+	}
+
+	UTextBlock* LogoutText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	LogoutText->SetText(FText::FromString(TEXT("Выйти из учетной записи")));
+	LogoutText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 10));
+	LogoutText->SetColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.5f, 0.5f, 1.0f)));
+	LogoutText->SetJustification(ETextJustify::Center);
+	AuthLogoutBtn->SetContent(LogoutText);
 }
 
 void URailMainMenuWidget::BuildLoadingOverlay(UCanvasPanel* RootCanvas)
 {
 	LoadingOverlayBorder = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("LoadingOverlayBorder"));
-	LoadingOverlayBorder->SetBrushColor(FLinearColor(0.01f, 0.015f, 0.03f, 0.88f));
+	LoadingOverlayBorder->SetBrushColor(FLinearColor(0.01f, 0.015f, 0.025f, 0.92f));
 	LoadingOverlayBorder->SetVisibility(ESlateVisibility::Collapsed);
 
-	UCanvasPanelSlot* LoadSlot = RootCanvas->AddChildToCanvas(LoadingOverlayBorder);
-	LoadSlot->SetAnchors(FAnchors(0.0f, 0.0f, 1.0f, 1.0f));
-	LoadSlot->SetOffsets(FMargin(0.0f));
-
-	USizeBox* CenterSizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass());
-	CenterSizeBox->SetWidthOverride(420.0f);
-
-	UBorder* CenterCard = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass());
-	CenterCard->SetBrushColor(FLinearColor(0.02f, 0.035f, 0.065f, 0.98f));
-	CenterCard->SetPadding(FMargin(32.0f, 24.0f));
-	CenterSizeBox->SetContent(CenterCard);
-
-	UCanvasPanel* SubPanel = WidgetTree->ConstructWidget<UCanvasPanel>(UCanvasPanel::StaticClass());
-	LoadingOverlayBorder->SetContent(SubPanel);
-
-	UCanvasPanelSlot* CenterSlot = SubPanel->AddChildToCanvas(CenterSizeBox);
-	CenterSlot->SetAnchors(FAnchors(0.5f, 0.5f, 0.5f, 0.5f));
-	CenterSlot->SetAlignment(FVector2D(0.5f, 0.5f));
-	CenterSlot->SetPosition(FVector2D(0.0f, 0.0f));
-	CenterSlot->SetAutoSize(true);
+	UCanvasPanelSlot* OverlaySlot = RootCanvas->AddChildToCanvas(LoadingOverlayBorder);
+	OverlaySlot->SetAnchors(FAnchors(0.0f, 0.0f, 1.0f, 1.0f));
+	OverlaySlot->SetOffsets(FMargin(0.0f));
 
 	UVerticalBox* VBox = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass());
-	CenterCard->SetContent(VBox);
+	LoadingOverlayBorder->SetContent(VBox);
 
-	UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	Title->SetText(FText::FromString(TEXT("Загрузка проекта...")));
-	Title->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 16));
-	Title->SetColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f)));
-	Title->SetJustification(ETextJustify::Center);
-	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(Title))
+	UTextBlock* SpinText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	SpinText->SetText(FText::FromString(TEXT("⏳")));
+	SpinText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 36));
+	SpinText->SetColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f)));
+	SpinText->SetJustification(ETextJustify::Center);
+	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(SpinText))
 	{
-		SubSlot->SetPadding(FMargin(0.0f, 0.0f, 0.0f, 10.0f));
+		SubSlot->SetHorizontalAlignment(HAlign_Center);
+		SubSlot->SetPadding(FMargin(0.0f, 240.0f, 0.0f, 12.0f));
 	}
 
 	LoadingStatusText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
-	LoadingStatusText->SetText(FText::FromString(TEXT("Подготовка рельефа и генерация геометрии...")));
-	LoadingStatusText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
-	LoadingStatusText->SetColorAndOpacity(FSlateColor(FLinearColor(0.7f, 0.78f, 0.88f, 1.0f)));
+	LoadingStatusText->SetText(FText::FromString(TEXT("Загрузка и подготовка рельефа...")));
+	LoadingStatusText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 16));
+	LoadingStatusText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
 	LoadingStatusText->SetJustification(ETextJustify::Center);
-	LoadingStatusText->SetAutoWrapText(true);
-	VBox->AddChildToVerticalBox(LoadingStatusText);
+	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(LoadingStatusText))
+	{
+		SubSlot->SetHorizontalAlignment(HAlign_Center);
+	}
 }
 
 void URailMainMenuWidget::ShowLoadingOverlay(const FString& InStatusText)
@@ -1089,6 +1482,11 @@ bool URailMainMenuWidget::CloseOpenModals()
 		CreateProjectModalBorder->SetVisibility(ESlateVisibility::Collapsed);
 		bClosedAny = true;
 	}
+	if (CreateCloudModalBorder && CreateCloudModalBorder->GetVisibility() == ESlateVisibility::Visible)
+	{
+		CreateCloudModalBorder->SetVisibility(ESlateVisibility::Collapsed);
+		bClosedAny = true;
+	}
 	if (AuthModalBorder && AuthModalBorder->GetVisibility() == ESlateVisibility::Visible)
 	{
 		AuthModalBorder->SetVisibility(ESlateVisibility::Collapsed);
@@ -1105,6 +1503,10 @@ void URailMainMenuWidget::ShowToast(const FString& Message, ERailToastType Type,
 	}
 }
 
+// ─────────────────────────────────────────────────────────────────
+//  Обработчики событий
+// ─────────────────────────────────────────────────────────────────
+
 void URailMainMenuWidget::HandleNewProjectClicked()
 {
 	if (CreateProjectModalBorder)
@@ -1115,14 +1517,33 @@ void URailMainMenuWidget::HandleNewProjectClicked()
 
 void URailMainMenuWidget::HandleOpenProjectsFolderClicked()
 {
-	FString RootDir = URailProjectManager::GetProjectsRootDirectory();
-	URailProjectManager::OpenFolderInExplorer(RootDir);
+	URailProjectManager::OpenFolderInExplorer(URailProjectManager::GetProjectsRootDirectory());
 }
 
 void URailMainMenuWidget::HandleAuthButtonClicked()
 {
 	if (AuthModalBorder)
 	{
+		URailApiService* Api = URailApiService::Get(this);
+		if (Api)
+		{
+			if (AuthLogoutBtn)
+			{
+				AuthLogoutBtn->SetVisibility(Api->IsAuthenticated() ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+			}
+			if (AuthStatusMessage)
+			{
+				if (Api->IsAuthenticated())
+				{
+					AuthStatusMessage->SetText(FText::FromString(FString::Printf(TEXT("Вы авторизованы как %s (роль: %s)"), *Api->GetAuthData().Email, *Api->GetAuthData().Role)));
+					AuthStatusMessage->SetColorAndOpacity(FSlateColor(FLinearColor(0.2f, 0.9f, 0.6f)));
+				}
+				else
+				{
+					AuthStatusMessage->SetText(FText::GetEmpty());
+				}
+			}
+		}
 		AuthModalBorder->SetVisibility(ESlateVisibility::Visible);
 	}
 }
@@ -1130,7 +1551,7 @@ void URailMainMenuWidget::HandleAuthButtonClicked()
 void URailMainMenuWidget::HandleRefreshLibraryClicked()
 {
 	RefreshProjectLibrary();
-	ShowToast(TEXT("Список локальных проектов обновлен"), ERailToastType::Info, 2.5f);
+	ShowToast(bShowingCloudProjects ? TEXT("Обновление облачных проектов...") : TEXT("Список локальных проектов обновлен"), ERailToastType::Info, 2.5f);
 }
 
 void URailMainMenuWidget::HandleGraphicsSettingsClicked()
@@ -1138,142 +1559,179 @@ void URailMainMenuWidget::HandleGraphicsSettingsClicked()
 	OnGraphicsSettingsRequested.Broadcast();
 }
 
+void URailMainMenuWidget::HandleTabLocalClicked()
+{
+	bShowingCloudProjects = false;
+	if (TabLocalBtn && TabCloudBtn)
+	{
+		TabLocalBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.06f, 0.24f, 0.42f, 0.95f), FLinearColor(0.1f, 0.34f, 0.58f, 1.0f), FLinearColor(0.04f, 0.18f, 0.32f, 1.0f)));
+		TabCloudBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.04f, 0.08f, 0.14f, 0.85f), FLinearColor(0.08f, 0.15f, 0.24f, 0.95f), FLinearColor(0.03f, 0.06f, 0.10f, 1.0f)));
+		TabLocalText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+		TabLocalText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+		TabCloudText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
+		TabCloudText->SetColorAndOpacity(FSlateColor(FLinearColor(0.7f, 0.75f, 0.85f, 1.0f)));
+	}
+	RefreshProjectLibrary();
+}
+
+void URailMainMenuWidget::HandleTabCloudClicked()
+{
+	bShowingCloudProjects = true;
+	if (TabLocalBtn && TabCloudBtn)
+	{
+		TabCloudBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.06f, 0.24f, 0.42f, 0.95f), FLinearColor(0.1f, 0.34f, 0.58f, 1.0f), FLinearColor(0.04f, 0.18f, 0.32f, 1.0f)));
+		TabLocalBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.04f, 0.08f, 0.14f, 0.85f), FLinearColor(0.08f, 0.15f, 0.24f, 0.95f), FLinearColor(0.03f, 0.06f, 0.10f, 1.0f)));
+		TabCloudText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+		TabCloudText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+		TabLocalText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
+		TabLocalText->SetColorAndOpacity(FSlateColor(FLinearColor(0.7f, 0.75f, 0.85f, 1.0f)));
+	}
+	RefreshProjectLibrary();
+}
+
+void URailMainMenuWidget::HandleCreateCloudProjectClicked()
+{
+	URailApiService* Api = URailApiService::Get(this);
+	if (!Api || !Api->IsAuthenticated())
+	{
+		ShowToast(TEXT("Для создания проектов в облаке войдите в учетную запись"), ERailToastType::Warning);
+		HandleAuthButtonClicked();
+		return;
+	}
+
+	if (CreateCloudModalBorder)
+	{
+		CreateCloudModalBorder->SetVisibility(ESlateVisibility::Visible);
+	}
+}
+
+void URailMainMenuWidget::HandleCreateCloudConfirmClicked()
+{
+	if (!CloudProjNameInput)
+		return;
+
+	const FString Name = CloudProjNameInput->GetText().ToString().TrimStartAndEnd();
+	const FString Desc = CloudProjDescInput ? CloudProjDescInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
+
+	if (Name.IsEmpty())
+	{
+		ShowToast(TEXT("Название проекта не может быть пустым"), ERailToastType::Error);
+		return;
+	}
+
+	if (URailApiService* Api = URailApiService::Get(this))
+	{
+		ShowToast(TEXT("Отправка запроса создания в API..."), ERailToastType::Info);
+		Api->CreateRemoteProject(Name, Desc);
+	}
+
+	if (CreateCloudModalBorder)
+	{
+		CreateCloudModalBorder->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void URailMainMenuWidget::HandleCreateCloudCancelClicked()
+{
+	if (CreateCloudModalBorder)
+	{
+		CreateCloudModalBorder->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
 void URailMainMenuWidget::HandleSourceTypeToggledPng()
 {
 	bSourceIsGeoTiff = false;
-	if (PngTypeText)
-	{
-		PngTypeText->SetText(FText::FromString(TEXT("●  16-бит PNG (готовый)")));
-		PngTypeText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
-	}
-	if (TifTypeText)
-	{
-		TifTypeText->SetText(FText::FromString(TEXT("○  GeoTIFF DEM (.tif)")));
-		TifTypeText->SetColorAndOpacity(FSlateColor(FLinearColor(0.65f, 0.72f, 0.82f, 1.0f)));
-	}
+	PngTypeButton->SetStyle(MakeGlassButtonStyle(FLinearColor(0.08f, 0.32f, 0.52f, 0.95f), FLinearColor(0.12f, 0.42f, 0.65f, 1.0f), FLinearColor(0.06f, 0.24f, 0.40f, 1.0f)));
+	TifTypeButton->SetStyle(MakeGlassButtonStyle(FLinearColor(0.05f, 0.08f, 0.14f, 0.85f), FLinearColor(0.09f, 0.15f, 0.24f, 0.95f), FLinearColor(0.03f, 0.06f, 0.10f, 1.0f)));
+	PngTypeText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 10));
+	PngTypeText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	TifTypeText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
+	TifTypeText->SetColorAndOpacity(FSlateColor(FLinearColor(0.6f, 0.68f, 0.78f, 1.0f)));
 }
 
 void URailMainMenuWidget::HandleSourceTypeToggledTif()
 {
 	bSourceIsGeoTiff = true;
-	if (PngTypeText)
-	{
-		PngTypeText->SetText(FText::FromString(TEXT("○  16-бит PNG (готовый)")));
-		PngTypeText->SetColorAndOpacity(FSlateColor(FLinearColor(0.65f, 0.72f, 0.82f, 1.0f)));
-	}
-	if (TifTypeText)
-	{
-		TifTypeText->SetText(FText::FromString(TEXT("●  GeoTIFF DEM (.tif)")));
-		TifTypeText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
-	}
+	TifTypeButton->SetStyle(MakeGlassButtonStyle(FLinearColor(0.08f, 0.32f, 0.52f, 0.95f), FLinearColor(0.12f, 0.42f, 0.65f, 1.0f), FLinearColor(0.06f, 0.24f, 0.40f, 1.0f)));
+	PngTypeButton->SetStyle(MakeGlassButtonStyle(FLinearColor(0.05f, 0.08f, 0.14f, 0.85f), FLinearColor(0.09f, 0.15f, 0.24f, 0.95f), FLinearColor(0.03f, 0.06f, 0.10f, 1.0f)));
+	TifTypeText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 10));
+	TifTypeText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	PngTypeText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 10));
+	PngTypeText->SetColorAndOpacity(FSlateColor(FLinearColor(0.6f, 0.68f, 0.78f, 1.0f)));
 }
 
 void URailMainMenuWidget::HandleBrowseFileClicked()
 {
-	FString SelectedFile;
-	bool bSuccess = false;
+	FString SelectedPath;
+	const FString Title = bSourceIsGeoTiff ? TEXT("Выберите GeoTIFF карту высот") : TEXT("Выберите 16-битный PNG файл высот");
+	const FString Filter = bSourceIsGeoTiff ? TEXT("GeoTIFF Images (*.tif;*.tiff)|*.tif;*.tiff") : TEXT("PNG Heightmap (*.png)|*.png");
 
-	if (bSourceIsGeoTiff)
-	{
-		bSuccess = URailProjectManager::OpenFileDialogWindows(
-			TEXT("Выберите файл цифровой модели рельефа GeoTIFF"),
-			TEXT("Файлы GeoTIFF (*.tif;*.tiff) *.tif;*.tiff Все файлы (*.*) *.* "),
-			SelectedFile);
-	}
-	else
-	{
-		bSuccess = URailProjectManager::OpenFileDialogWindows(
-			TEXT("Выберите 16-битную карту высот PNG"),
-			TEXT("Файлы PNG (*.png) *.png Все файлы (*.*) *.* "),
-			SelectedFile);
-	}
-
-	if (bSuccess && !SelectedFile.IsEmpty())
+	if (URailProjectManager::OpenFileDialogWindows(Title, Filter, SelectedPath))
 	{
 		if (FilePathInput)
 		{
-			FilePathInput->SetText(FText::FromString(SelectedFile));
+			FilePathInput->SetText(FText::FromString(SelectedPath));
 		}
 	}
 }
 
 void URailMainMenuWidget::HandleCreateProjectConfirmClicked()
 {
-	const FString ProjectName = ProjectNameInput ? ProjectNameInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
-	if (ProjectName.IsEmpty())
+	const FString ProjName = ProjectNameInput ? ProjectNameInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
+	const FString SrcPath = FilePathInput ? FilePathInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
+
+	if (ProjName.IsEmpty())
 	{
-		ShowToast(TEXT("Пожалуйста, укажите название проекта!"), ERailToastType::Warning);
+		ShowToast(TEXT("Укажите название проекта!"), ERailToastType::Error);
+		return;
+	}
+	if (SrcPath.IsEmpty() || !FPaths::FileExists(SrcPath))
+	{
+		ShowToast(TEXT("Указанный файл рельефа не найден!"), ERailToastType::Error);
 		return;
 	}
 
-	const FString SourcePath = FilePathInput ? FilePathInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
-	if (SourcePath.IsEmpty() || !FPaths::FileExists(SourcePath))
-	{
-		ShowToast(TEXT("Указанный файл рельефа не существует на диске!"), ERailToastType::Error);
-		return;
-	}
-
-	const FString SelectedCatStr = CategoryComboBox ? CategoryComboBox->GetSelectedOption() : TEXT("I Категория");
-	ERailRoadCategory Cat = ERailRoadCategory::Category1;
-	if (SelectedCatStr.Contains(TEXT("Скоростные")))
-	{
-		Cat = ERailRoadCategory::HighSpeed;
-	}
-	else if (SelectedCatStr.Contains(TEXT("Пассажирские")))
-	{
-		Cat = ERailRoadCategory::Passenger;
-	}
-	else if (SelectedCatStr.Contains(TEXT("Особогрузонапряженные")))
-	{
-		Cat = ERailRoadCategory::SuperHeavyHaul;
-	}
-	else if (SelectedCatStr.Contains(TEXT("II Категория")))
-	{
-		Cat = ERailRoadCategory::Category2;
-	}
-	else if (SelectedCatStr.Contains(TEXT("III Категория")))
-	{
-		Cat = ERailRoadCategory::Category3;
-	}
-	else if (SelectedCatStr.Contains(TEXT("подъездные")))
-	{
-		Cat = ERailRoadCategory::Category4Access;
-	}
-	else if (SelectedCatStr.Contains(TEXT("линии")))
-	{
-		Cat = ERailRoadCategory::Category4Lines;
-	}
-
+	const int32 CatIdx = CategoryComboBox ? CategoryComboBox->GetSelectedIndex() : 2;
+	const ERailRoadCategory Category = static_cast<ERailRoadCategory>(FMath::Clamp(CatIdx, 0, 7));
 	const bool bRoads = RoadsCheckBox ? RoadsCheckBox->IsChecked() : false;
 	const bool bRivers = RiversCheckBox ? RiversCheckBox->IsChecked() : false;
 
-	ShowLoadingOverlay(TEXT("Обработка файлов рельефа и слоев проекта..."));
+	ShowLoadingOverlay(TEXT("Создание проекта и подготовка рельефа..."));
 
 	FRailProjectMetadata CreatedProject;
 	FString ErrorMsg;
-	bool bOk = false;
+	bool bSuccess = false;
 
 	if (bSourceIsGeoTiff)
 	{
-		bOk = URailProjectManager::CreateProjectFromGeoTiff(
-			ProjectName, Cat, SourcePath, bRoads, bRivers, CreatedProject, ErrorMsg);
+		bSuccess = URailProjectManager::CreateProjectFromGeoTiff(ProjName, Category, SrcPath, bRoads, bRivers, CreatedProject, ErrorMsg);
 	}
 	else
 	{
-		bOk = URailProjectManager::CreateProjectFromPng(
-			ProjectName, Cat, SourcePath, bRoads, bRivers, CreatedProject, ErrorMsg);
+		bSuccess = URailProjectManager::CreateProjectFromPng(ProjName, Category, SrcPath, bRoads, bRivers, CreatedProject, ErrorMsg);
 	}
 
 	HideLoadingOverlay();
 
-	if (bOk)
+	if (bSuccess)
 	{
 		if (CreateProjectModalBorder)
 		{
 			CreateProjectModalBorder->SetVisibility(ESlateVisibility::Collapsed);
 		}
+		ShowToast(TEXT("Проект успешно создан!"), ERailToastType::Success);
+
+		// Если пользователь авторизован в облаке, автоматически создаем проект в API
+		if (URailApiService* Api = URailApiService::Get(this))
+		{
+			if (Api->IsAuthenticated())
+			{
+				Api->SyncLocalProjectToCloud(CreatedProject);
+			}
+		}
+
 		RefreshProjectLibrary();
-		ShowToast(FString::Printf(TEXT("Проект '%s' успешно создан!"), *ProjectName), ERailToastType::Success);
 		OnProjectOpened.Broadcast(CreatedProject);
 	}
 	else
@@ -1290,13 +1748,82 @@ void URailMainMenuWidget::HandleCreateProjectCancelClicked()
 	}
 }
 
+void URailMainMenuWidget::HandleAuthModeLoginClicked()
+{
+	bAuthIsRegisterMode = false;
+	AuthTabLoginBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.08f, 0.32f, 0.52f, 0.95f), FLinearColor(0.12f, 0.42f, 0.65f, 1.0f), FLinearColor(0.06f, 0.24f, 0.40f, 1.0f)));
+	AuthTabRegisterBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.05f, 0.08f, 0.14f, 0.85f), FLinearColor(0.09f, 0.15f, 0.24f, 0.95f), FLinearColor(0.03f, 0.06f, 0.10f, 1.0f)));
+	AuthTabLoginText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	AuthTabLoginText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	AuthTabRegisterText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
+	AuthTabRegisterText->SetColorAndOpacity(FSlateColor(FLinearColor(0.7f, 0.75f, 0.85f, 1.0f)));
+
+	AuthTitleText->SetText(FText::FromString(TEXT("ВХОД В ОБЛАКО (JWT / API)")));
+	AuthSubmitText->SetText(FText::FromString(TEXT("ВОЙТИ В СИСТЕМУ")));
+}
+
+void URailMainMenuWidget::HandleAuthModeRegisterClicked()
+{
+	bAuthIsRegisterMode = true;
+	AuthTabRegisterBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.08f, 0.32f, 0.52f, 0.95f), FLinearColor(0.12f, 0.42f, 0.65f, 1.0f), FLinearColor(0.06f, 0.24f, 0.40f, 1.0f)));
+	AuthTabLoginBtn->SetStyle(MakeGlassButtonStyle(FLinearColor(0.05f, 0.08f, 0.14f, 0.85f), FLinearColor(0.09f, 0.15f, 0.24f, 0.95f), FLinearColor(0.03f, 0.06f, 0.10f, 1.0f)));
+	AuthTabRegisterText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	AuthTabRegisterText->SetColorAndOpacity(FSlateColor(FLinearColor::White));
+	AuthTabLoginText->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 11));
+	AuthTabLoginText->SetColorAndOpacity(FSlateColor(FLinearColor(0.7f, 0.75f, 0.85f, 1.0f)));
+
+	AuthTitleText->SetText(FText::FromString(TEXT("РЕГИСТРАЦИЯ В СИСТЕМЕ (API)")));
+	AuthSubmitText->SetText(FText::FromString(TEXT("ЗАРЕГИСТРИРОВАТЬСЯ")));
+}
+
 void URailMainMenuWidget::HandleAuthSubmitClicked()
 {
+	URailApiService* Api = URailApiService::Get(this);
+	if (!Api)
+	{
+		ShowToast(TEXT("Сервис API недоступен"), ERailToastType::Error);
+		return;
+	}
+
+	const FString Email = AuthEmailInput ? AuthEmailInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
+	const FString Password = AuthPassInput ? AuthPassInput->GetText().ToString() : TEXT("");
+
+	if (Email.IsEmpty() || Password.IsEmpty())
+	{
+		if (AuthStatusMessage)
+		{
+			AuthStatusMessage->SetText(FText::FromString(TEXT("Заполните Email и пароль")));
+			AuthStatusMessage->SetColorAndOpacity(FSlateColor(FLinearColor(1.0f, 0.4f, 0.4f)));
+		}
+		return;
+	}
+
+	if (AuthStatusMessage)
+	{
+		AuthStatusMessage->SetText(FText::FromString(TEXT("Отправка запроса на сервер...")));
+		AuthStatusMessage->SetColorAndOpacity(FSlateColor(FLinearColor(0.4f, 0.85f, 1.0f)));
+	}
+
+	if (bAuthIsRegisterMode)
+	{
+		Api->Register(Email, Password);
+	}
+	else
+	{
+		Api->Login(Email, Password);
+	}
+}
+
+void URailMainMenuWidget::HandleAuthLogoutClicked()
+{
+	if (URailApiService* Api = URailApiService::Get(this))
+	{
+		Api->Logout();
+	}
 	if (AuthModalBorder)
 	{
 		AuthModalBorder->SetVisibility(ESlateVisibility::Collapsed);
 	}
-	ShowToast(TEXT("Авторизация успешна! Облачные проекты синхронизированы."), ERailToastType::Success);
 }
 
 void URailMainMenuWidget::HandleAuthCloseClicked()
@@ -1304,6 +1831,57 @@ void URailMainMenuWidget::HandleAuthCloseClicked()
 	if (AuthModalBorder)
 	{
 		AuthModalBorder->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void URailMainMenuWidget::HandleApiAuthCompleted(bool bSuccess, const FString& Message, const FString& Email, const FString& Role)
+{
+	UpdateHeaderProfileUI();
+
+	if (AuthStatusMessage)
+	{
+		AuthStatusMessage->SetText(FText::FromString(Message));
+		AuthStatusMessage->SetColorAndOpacity(FSlateColor(bSuccess ? FLinearColor(0.2f, 0.9f, 0.6f) : FLinearColor(1.0f, 0.4f, 0.4f)));
+	}
+
+	if (bSuccess)
+	{
+		ShowToast(FString::Printf(TEXT("Вход выполнен: %s (%s)"), *Email, *Role), ERailToastType::Success);
+		if (AuthModalBorder)
+		{
+			AuthModalBorder->SetVisibility(ESlateVisibility::Collapsed);
+		}
+		RefreshProjectLibrary();
+	}
+	else
+	{
+		ShowToast(Message, ERailToastType::Error, 5.0f);
+	}
+}
+
+void URailMainMenuWidget::HandleApiProjectsReceived(bool bSuccess, const TArray<FRailCloudProject>& Projects, const FString& ErrorMessage)
+{
+	if (bShowingCloudProjects)
+	{
+		RefreshProjectLibrary();
+	}
+}
+
+void URailMainMenuWidget::HandleApiProjectActionCompleted(bool bSuccess, const FRailCloudProject& Project, const FString& Message)
+{
+	ShowToast(Message, bSuccess ? ERailToastType::Success : ERailToastType::Error);
+	if (bShowingCloudProjects)
+	{
+		RefreshProjectLibrary();
+	}
+}
+
+void URailMainMenuWidget::HandleApiProjectDeleted(bool bSuccess, const FString& Message)
+{
+	ShowToast(Message, bSuccess ? ERailToastType::Info : ERailToastType::Error);
+	if (bShowingCloudProjects)
+	{
+		RefreshProjectLibrary();
 	}
 }
 

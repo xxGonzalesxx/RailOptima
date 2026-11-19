@@ -77,4 +77,21 @@ struct FRailProjectMetadata
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Project")
 	double TotalCost_kRub = 0.0;
+
+	// ─── Интеграция с Backend API ─────────────────────────────────
+	// Идентификатор проекта на сервере (UUID)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|API")
+	FString RemoteId;
+
+	// Описание проекта в облаке
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|API")
+	FString Description;
+
+	// Статус в облаке (CREATED, IN_PROGRESS, COMPLETED)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|API")
+	FString CloudStatus = TEXT("CREATED");
+
+	// Синхронизирован ли проект с облаком
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|API")
+	bool bIsSyncedWithCloud = false;
 };

@@ -190,6 +190,11 @@ bool URailProjectManager::LoadProject(const FString& InProjectDir, FRailProjectM
 	Root->TryGetNumberField(TEXT("total_length_m"), OutProject.TotalLength_m);
 	Root->TryGetNumberField(TEXT("total_cost_krub"), OutProject.TotalCost_kRub);
 
+	Root->TryGetStringField(TEXT("remote_id"), OutProject.RemoteId);
+	Root->TryGetStringField(TEXT("description"), OutProject.Description);
+	Root->TryGetStringField(TEXT("cloud_status"), OutProject.CloudStatus);
+	Root->TryGetBoolField(TEXT("is_synced"), OutProject.bIsSyncedWithCloud);
+
 	return true;
 }
 
@@ -227,6 +232,11 @@ bool URailProjectManager::SaveProject(const FRailProjectMetadata& InProject)
 
 	Root->SetNumberField(TEXT("total_length_m"), InProject.TotalLength_m);
 	Root->SetNumberField(TEXT("total_cost_krub"), InProject.TotalCost_kRub);
+
+	Root->SetStringField(TEXT("remote_id"), InProject.RemoteId);
+	Root->SetStringField(TEXT("description"), InProject.Description);
+	Root->SetStringField(TEXT("cloud_status"), InProject.CloudStatus);
+	Root->SetBoolField(TEXT("is_synced"), InProject.bIsSyncedWithCloud);
 
 	FString OutputString;
 	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
