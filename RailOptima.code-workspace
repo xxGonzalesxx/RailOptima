@@ -6,16 +6,16 @@
 		},
 		{
 			"name": "UE5",
-			"path": "C:\\Program Files\\Epic Games\\UE_5.8"
+			"path": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 		}
 	],
 	"settings": {
 		"js/ts.tsc.autoDetect": "off",
 		"npm.autoDetect": "off",
-		"terminal.integrated.env.windows": {
-			"PATH": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Binaries\\ThirdParty\\DotNet\\10.0\\win-x64;${env:PATH}",
-			"DOTNET_ROOT": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Binaries\\ThirdParty\\DotNet\\10.0\\win-x64",
-			"DOTNET_HOST_PATH": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Binaries\\ThirdParty\\DotNet\\10.0\\win-x64\\dotnet.exe",
+		"terminal.integrated.env.linux": {
+			"PATH": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Binaries/ThirdParty/DotNet/10.0/linux-x64:${env:PATH}",
+			"DOTNET_ROOT": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Binaries/ThirdParty/DotNet/10.0/linux-x64",
+			"DOTNET_HOST_PATH": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Binaries/ThirdParty/DotNet/10.0/linux-x64/dotnet",
 			"DOTNET_MULTILEVEL_LOOKUP": "0",
 			"DOTNET_ROLL_FORWARD": "LatestMajor"
 		}
@@ -30,435 +30,718 @@
 		"version": "2.0.0",
 		"tasks": [
 			{
-				"label": "RailOptima Win64 Debug Build",
+				"label": "RailOptima Linux Debug Build",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"Debug",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptima Win64 Debug Rebuild",
+				"label": "RailOptima Linux Debug Rebuild",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"Debug",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"dependsOn": [
-					"RailOptima Win64 Debug Clean"
+					"RailOptima Linux Debug Clean"
 				],
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptima Win64 Debug Clean",
+				"label": "RailOptima Linux Debug Clean",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Clean.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"Debug",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptima Linux DebugGame Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptima",
+					"Linux",
+					"DebugGame",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptima Win64 DebugGame Build",
+				"label": "RailOptima Linux DebugGame Rebuild",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"DebugGame",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
-					"-waitmutex"
-				],
-				"problemMatcher": "$msCompile",
-				"type": "shell",
-				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
-			},
-			{
-				"label": "RailOptima Win64 DebugGame Rebuild",
-				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
-				"args": [
-					"RailOptima",
-					"Win64",
-					"DebugGame",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"dependsOn": [
-					"RailOptima Win64 DebugGame Clean"
+					"RailOptima Linux DebugGame Clean"
 				],
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptima Win64 DebugGame Clean",
+				"label": "RailOptima Linux DebugGame Clean",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Clean.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"DebugGame",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptima Linux Development Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptima",
+					"Linux",
+					"Development",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptima Win64 Development Build",
+				"label": "RailOptima Linux Development Rebuild",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"Development",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
-					"-waitmutex"
-				],
-				"problemMatcher": "$msCompile",
-				"type": "shell",
-				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
-			},
-			{
-				"label": "RailOptima Win64 Development Rebuild",
-				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
-				"args": [
-					"RailOptima",
-					"Win64",
-					"Development",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"dependsOn": [
-					"RailOptima Win64 Development Clean"
+					"RailOptima Linux Development Clean"
 				],
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptima Win64 Development Clean",
+				"label": "RailOptima Linux Development Clean",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Clean.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"Development",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
-					"-waitmutex"
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
 				],
 				"problemMatcher": "$msCompile",
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptima Win64 Test Build",
+				"label": "RailOptima Linux Test Build",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"Test",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptima Win64 Test Rebuild",
+				"label": "RailOptima Linux Test Rebuild",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"Test",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"dependsOn": [
-					"RailOptima Win64 Test Clean"
+					"RailOptima Linux Test Clean"
 				],
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptima Win64 Test Clean",
+				"label": "RailOptima Linux Test Clean",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Clean.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"Test",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
-					"-waitmutex"
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
 				],
 				"problemMatcher": "$msCompile",
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptima Win64 Shipping Build",
+				"label": "RailOptima Linux Shipping Build",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"Shipping",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptima Win64 Shipping Rebuild",
+				"label": "RailOptima Linux Shipping Rebuild",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"Shipping",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"dependsOn": [
-					"RailOptima Win64 Shipping Clean"
+					"RailOptima Linux Shipping Clean"
 				],
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptima Win64 Shipping Clean",
+				"label": "RailOptima Linux Shipping Clean",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Clean.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
 					"RailOptima",
-					"Win64",
+					"Linux",
 					"Shipping",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptima LinuxArm64 Debug Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptima",
+					"LinuxArm64",
+					"Debug",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptimaEditor Win64 Debug Build",
+				"label": "RailOptima LinuxArm64 Debug Rebuild",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
-					"RailOptimaEditor",
-					"Win64",
+					"RailOptima",
+					"LinuxArm64",
 					"Debug",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
-					"-waitmutex"
-				],
-				"problemMatcher": "$msCompile",
-				"type": "shell",
-				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
-			},
-			{
-				"label": "RailOptimaEditor Win64 Debug Rebuild",
-				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
-				"args": [
-					"RailOptimaEditor",
-					"Win64",
-					"Debug",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"dependsOn": [
-					"RailOptimaEditor Win64 Debug Clean"
+					"RailOptima LinuxArm64 Debug Clean"
 				],
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptimaEditor Win64 Debug Clean",
+				"label": "RailOptima LinuxArm64 Debug Clean",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Clean.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
-					"RailOptimaEditor",
-					"Win64",
+					"RailOptima",
+					"LinuxArm64",
 					"Debug",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptima LinuxArm64 DebugGame Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptima",
+					"LinuxArm64",
+					"DebugGame",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptimaEditor Win64 DebugGame Build",
+				"label": "RailOptima LinuxArm64 DebugGame Rebuild",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
-					"RailOptimaEditor",
-					"Win64",
+					"RailOptima",
+					"LinuxArm64",
 					"DebugGame",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
-					"-waitmutex"
-				],
-				"problemMatcher": "$msCompile",
-				"type": "shell",
-				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
-			},
-			{
-				"label": "RailOptimaEditor Win64 DebugGame Rebuild",
-				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
-				"args": [
-					"RailOptimaEditor",
-					"Win64",
-					"DebugGame",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"dependsOn": [
-					"RailOptimaEditor Win64 DebugGame Clean"
+					"RailOptima LinuxArm64 DebugGame Clean"
 				],
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptimaEditor Win64 DebugGame Clean",
+				"label": "RailOptima LinuxArm64 DebugGame Clean",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Clean.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
-					"RailOptimaEditor",
-					"Win64",
+					"RailOptima",
+					"LinuxArm64",
 					"DebugGame",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptima LinuxArm64 Development Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptima",
+					"LinuxArm64",
+					"Development",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptimaEditor Win64 Development Build",
+				"label": "RailOptima LinuxArm64 Development Rebuild",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
-					"RailOptimaEditor",
-					"Win64",
+					"RailOptima",
+					"LinuxArm64",
 					"Development",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
-					"-waitmutex"
-				],
-				"problemMatcher": "$msCompile",
-				"type": "shell",
-				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
-			},
-			{
-				"label": "RailOptimaEditor Win64 Development Rebuild",
-				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Build.bat",
-				"args": [
-					"RailOptimaEditor",
-					"Win64",
-					"Development",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"dependsOn": [
-					"RailOptimaEditor Win64 Development Clean"
+					"RailOptima LinuxArm64 Development Clean"
 				],
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			},
 			{
-				"label": "RailOptimaEditor Win64 Development Clean",
+				"label": "RailOptima LinuxArm64 Development Clean",
 				"group": "build",
-				"command": "Engine\\Build\\BatchFiles\\Clean.bat",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
 				"args": [
-					"RailOptimaEditor",
-					"Win64",
+					"RailOptima",
+					"LinuxArm64",
 					"Development",
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptima LinuxArm64 Test Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptima",
+					"LinuxArm64",
+					"Test",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-waitmutex"
 				],
 				"problemMatcher": "$msCompile",
 				"type": "shell",
 				"options": {
-					"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptima LinuxArm64 Test Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptima",
+					"LinuxArm64",
+					"Test",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"RailOptima LinuxArm64 Test Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptima LinuxArm64 Test Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptima",
+					"LinuxArm64",
+					"Test",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptima LinuxArm64 Shipping Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptima",
+					"LinuxArm64",
+					"Shipping",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptima LinuxArm64 Shipping Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptima",
+					"LinuxArm64",
+					"Shipping",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"RailOptima LinuxArm64 Shipping Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptima LinuxArm64 Shipping Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptima",
+					"LinuxArm64",
+					"Shipping",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptimaEditor Linux Debug Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptimaEditor",
+					"Linux",
+					"Debug",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptimaEditor Linux Debug Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptimaEditor",
+					"Linux",
+					"Debug",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"RailOptimaEditor Linux Debug Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptimaEditor Linux Debug Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptimaEditor",
+					"Linux",
+					"Debug",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptimaEditor Linux DebugGame Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptimaEditor",
+					"Linux",
+					"DebugGame",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptimaEditor Linux DebugGame Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptimaEditor",
+					"Linux",
+					"DebugGame",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"RailOptimaEditor Linux DebugGame Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptimaEditor Linux DebugGame Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptimaEditor",
+					"Linux",
+					"DebugGame",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptimaEditor Linux Development Build",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptimaEditor",
+					"Linux",
+					"Development",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptimaEditor Linux Development Rebuild",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptimaEditor",
+					"Linux",
+					"Development",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex"
+				],
+				"problemMatcher": "$msCompile",
+				"dependsOn": [
+					"RailOptimaEditor Linux Development Clean"
+				],
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
+				}
+			},
+			{
+				"label": "RailOptimaEditor Linux Development Clean",
+				"group": "build",
+				"command": "Engine/Build/BatchFiles/Linux/Build.sh",
+				"args": [
+					"RailOptimaEditor",
+					"Linux",
+					"Development",
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
+					"-waitmutex",
+					"-clean"
+				],
+				"problemMatcher": "$msCompile",
+				"type": "shell",
+				"options": {
+					"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 				}
 			}
 		]
@@ -469,182 +752,127 @@
 			{
 				"name": "Launch RailOptima (Debug)",
 				"request": "launch",
-				"program": "C:\\Projects\\UE\\RailOptima\\Binaries\\Win64\\UnrealGame-Win64-Debug.exe",
-				"preLaunchTask": "RailOptima Win64 Debug Build",
+				"program": "/home/stefangonzales/IdeaProjects/RailOptima/Binaries/Linux/UnrealGame-Linux-Debug",
+				"preLaunchTask": "RailOptima Linux Debug Build",
 				"args": [
 				],
-				"cwd": "C:\\Program Files\\Epic Games\\UE_5.8",
-				"stopAtEntry": false,
-				"console": "integratedTerminal",
-				"type": "cppvsdbg",
-				"visualizerFile": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Extras\\VisualStudioDebugging\\Unreal.natvis",
-				"sourceFileMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				},
-				"sourceMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
+				"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2",
+				"type": "cppdbg",
+				"visualizerFile": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
 			},
 			{
 				"name": "Launch RailOptima (DebugGame)",
 				"request": "launch",
-				"program": "C:\\Projects\\UE\\RailOptima\\Binaries\\Win64\\UnrealGame-Win64-DebugGame.exe",
-				"preLaunchTask": "RailOptima Win64 DebugGame Build",
+				"program": "/home/stefangonzales/IdeaProjects/RailOptima/Binaries/Linux/UnrealGame-Linux-DebugGame",
+				"preLaunchTask": "RailOptima Linux DebugGame Build",
 				"args": [
 				],
-				"cwd": "C:\\Program Files\\Epic Games\\UE_5.8",
-				"stopAtEntry": false,
-				"console": "integratedTerminal",
-				"type": "cppvsdbg",
-				"visualizerFile": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Extras\\VisualStudioDebugging\\Unreal.natvis",
-				"sourceFileMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				},
-				"sourceMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
+				"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2",
+				"type": "cppdbg",
+				"visualizerFile": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
 			},
 			{
 				"name": "Launch RailOptima (Development)",
 				"request": "launch",
-				"program": "C:\\Projects\\UE\\RailOptima\\Binaries\\Win64\\UnrealGame.exe",
-				"preLaunchTask": "RailOptima Win64 Development Build",
+				"program": "/home/stefangonzales/IdeaProjects/RailOptima/Binaries/Linux/UnrealGame",
+				"preLaunchTask": "RailOptima Linux Development Build",
 				"args": [
 				],
-				"cwd": "C:\\Program Files\\Epic Games\\UE_5.8",
-				"stopAtEntry": false,
-				"console": "integratedTerminal",
-				"type": "cppvsdbg",
-				"visualizerFile": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Extras\\VisualStudioDebugging\\Unreal.natvis",
-				"sourceFileMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				},
-				"sourceMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
+				"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2",
+				"type": "cppdbg",
+				"visualizerFile": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
 			},
 			{
 				"name": "Launch RailOptima (Test)",
 				"request": "launch",
-				"program": "C:\\Projects\\UE\\RailOptima\\Binaries\\Win64\\UnrealGame-Win64-Test.exe",
-				"preLaunchTask": "RailOptima Win64 Test Build",
+				"program": "/home/stefangonzales/IdeaProjects/RailOptima/Binaries/Linux/UnrealGame-Linux-Test",
+				"preLaunchTask": "RailOptima Linux Test Build",
 				"args": [
 				],
-				"cwd": "C:\\Program Files\\Epic Games\\UE_5.8",
-				"stopAtEntry": false,
-				"console": "integratedTerminal",
-				"type": "cppvsdbg",
-				"visualizerFile": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Extras\\VisualStudioDebugging\\Unreal.natvis",
-				"sourceFileMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				},
-				"sourceMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
+				"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2",
+				"type": "cppdbg",
+				"visualizerFile": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
 			},
 			{
 				"name": "Launch RailOptima (Shipping)",
 				"request": "launch",
-				"program": "C:\\Projects\\UE\\RailOptima\\Binaries\\Win64\\UnrealGame-Win64-Shipping.exe",
-				"preLaunchTask": "RailOptima Win64 Shipping Build",
+				"program": "/home/stefangonzales/IdeaProjects/RailOptima/Binaries/Linux/UnrealGame-Linux-Shipping",
+				"preLaunchTask": "RailOptima Linux Shipping Build",
 				"args": [
 				],
-				"cwd": "C:\\Program Files\\Epic Games\\UE_5.8",
-				"stopAtEntry": false,
-				"console": "integratedTerminal",
-				"type": "cppvsdbg",
-				"visualizerFile": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Extras\\VisualStudioDebugging\\Unreal.natvis",
-				"sourceFileMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				},
-				"sourceMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
+				"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2",
+				"type": "cppdbg",
+				"visualizerFile": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
 			},
 			{
 				"name": "Launch RailOptimaEditor (Debug)",
 				"request": "launch",
-				"program": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Binaries\\Win64\\UnrealEditor-Win64-Debug.exe",
-				"preLaunchTask": "RailOptimaEditor Win64 Debug Build",
+				"program": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Binaries/Linux/UnrealEditor-Linux-Debug",
+				"preLaunchTask": "RailOptimaEditor Linux Debug Build",
 				"args": [
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject"
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject"
 				],
-				"cwd": "C:\\Program Files\\Epic Games\\UE_5.8",
-				"stopAtEntry": false,
-				"console": "integratedTerminal",
-				"type": "cppvsdbg",
-				"visualizerFile": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Extras\\VisualStudioDebugging\\Unreal.natvis",
-				"sourceFileMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				},
-				"sourceMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
+				"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2",
+				"type": "cppdbg",
+				"visualizerFile": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
 			},
 			{
 				"name": "Launch RailOptimaEditor (DebugGame)",
 				"request": "launch",
-				"program": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Binaries\\Win64\\UnrealEditor-Win64-DebugGame.exe",
-				"preLaunchTask": "RailOptimaEditor Win64 DebugGame Build",
+				"program": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Binaries/Linux/UnrealEditor-Linux-DebugGame",
+				"preLaunchTask": "RailOptimaEditor Linux DebugGame Build",
 				"args": [
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject"
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject"
 				],
-				"cwd": "C:\\Program Files\\Epic Games\\UE_5.8",
-				"stopAtEntry": false,
-				"console": "integratedTerminal",
-				"type": "cppvsdbg",
-				"visualizerFile": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Extras\\VisualStudioDebugging\\Unreal.natvis",
-				"sourceFileMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				},
-				"sourceMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
+				"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2",
+				"type": "cppdbg",
+				"visualizerFile": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
 			},
 			{
 				"name": "Launch RailOptimaEditor (Development)",
 				"request": "launch",
-				"program": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Binaries\\Win64\\UnrealEditor.exe",
-				"preLaunchTask": "RailOptimaEditor Win64 Development Build",
+				"program": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Binaries/Linux/UnrealEditor",
+				"preLaunchTask": "RailOptimaEditor Linux Development Build",
 				"args": [
-					"C:\\Projects\\UE\\RailOptima\\RailOptima.uproject"
+					"/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject"
 				],
-				"cwd": "C:\\Program Files\\Epic Games\\UE_5.8",
-				"stopAtEntry": false,
-				"console": "integratedTerminal",
-				"type": "cppvsdbg",
-				"visualizerFile": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Extras\\VisualStudioDebugging\\Unreal.natvis",
-				"sourceFileMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				},
-				"sourceMap": {
-					"D:\\build\\++UE5\\Sync": "C:\\Program Files\\Epic Games\\UE_5.8"
-				}
+				"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2",
+				"type": "cppdbg",
+				"visualizerFile": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Extras/VisualStudioDebugging/Unreal.natvis",
+				"showDisplayString": true
 			},
 			{
 				"name": "Generate Project Files",
 				"type": "coreclr",
 				"request": "launch",
-				"preLaunchTask": "UnrealBuildTool Win64 Development Build",
-				"program": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Build\\BatchFiles\\RunUBT.bat",
+				"preLaunchTask": "UnrealBuildTool Linux Development Build",
+				"program": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Build/BatchFiles/RunUBT.sh",
 				"args": [
 					"-projectfiles",
 					"-vscode",
-					"-project=C:\\Projects\\UE\\RailOptima\\RailOptima.uproject",
+					"-project=/home/stefangonzales/IdeaProjects/RailOptima/RailOptima.uproject",
 					"-game",
 					"-engine",
 					"-dotnet"
 				],
 				"env": {
-					"PATH": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Binaries\\ThirdParty\\DotNet\\10.0\\win-x64;${env:PATH}",
-					"DOTNET_ROOT": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Binaries\\ThirdParty\\DotNet\\10.0\\win-x64",
-					"DOTNET_HOST_PATH": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Binaries\\ThirdParty\\DotNet\\10.0\\win-x64\\dotnet.exe",
+					"PATH": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Binaries/ThirdParty/DotNet/10.0/linux-x64:${env:PATH}",
+					"DOTNET_ROOT": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Binaries/ThirdParty/DotNet/10.0/linux-x64",
+					"DOTNET_HOST_PATH": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2/Engine/Binaries/ThirdParty/DotNet/10.0/linux-x64/dotnet",
 					"DOTNET_MULTILEVEL_LOOKUP": "0",
 					"DOTNET_ROLL_FORWARD": "LatestMajor"
 				},
-				"console": "integratedTerminal",
+				"console": "internalConsole",
+				"internalConsoleOptions": "openOnSessionStart",
 				"stopAtEntry": false,
-				"cwd": "C:\\Program Files\\Epic Games\\UE_5.8"
+				"cwd": "/home/stefangonzales/Applications/UnrealEngine/UE_5.8.2"
 			}
 		]
 	}

@@ -11,7 +11,15 @@ public class xlsxwriter : ModuleRules
 
         PublicIncludePaths.Add(Path.Combine(ModulePath, "include"));
 
-        PublicAdditionalLibraries.Add(Path.Combine(ModulePath, "lib", "xlsxwriter.lib"));
-        PublicAdditionalLibraries.Add(Path.Combine(ModulePath, "lib", "libzs.lib"));
+        if (Target.Platform == UnrealTargetPlatform.Win64)
+        {
+            PublicAdditionalLibraries.Add(Path.Combine(ModulePath, "lib", "xlsxwriter.lib"));
+            PublicAdditionalLibraries.Add(Path.Combine(ModulePath, "lib", "libzs.lib"));
+        }
+        else if (Target.Platform == UnrealTargetPlatform.Linux)
+        {
+            PublicAdditionalLibraries.Add("/usr/lib64/libxlsxwriter.so");
+            PublicDependencyModuleNames.Add("zlib");
+        }
     }
 }

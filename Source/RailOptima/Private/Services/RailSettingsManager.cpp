@@ -21,6 +21,11 @@ void URailSettingsManager::InitializeSettings(bool bForceBenchmark)
 
 	if (!bBenchmarkDone || bForceBenchmark)
 	{
+#if PLATFORM_LINUX
+		// На Linux/Vulkan встроенный GPU-бенчмарк UE может вешать драйвер NVIDIA — сразу ставим пресет Medium (1) или Low (0)
+		UE_LOG(LogTemp, Log, TEXT("[RailSettings] Linux: пропуск аппаратного бенчмарка, применяем оптимизированный пресет."));
+		ApplyQualityPreset(1); // 0 = Низкое (без Lumen), 1 = Среднее
+#else
 		UE_LOG(LogTemp, Log, TEXT("[RailSettings] Автонастройка: запуск бенчмарка оборудования..."));
 		Settings->RunHardwareBenchmark(10, 1.0f, 1.0f);
 		Settings->ApplyHardwareBenchmarkResults();
@@ -30,7 +35,6 @@ void URailSettingsManager::InitializeSettings(bool bForceBenchmark)
 
 		if (Overall <= 0)
 		{
-			// Слабое железо: применяем щадящие лимиты и консольные оптимизации
 			Settings->SetFrameRateLimit(60.0f);
 			Settings->SetResolutionScaleNormalized(0.70f);
 			ApplyLowEndOptimizations(true);
@@ -50,6 +54,7 @@ void URailSettingsManager::InitializeSettings(bool bForceBenchmark)
 
 		Settings->ApplySettings(false);
 		Settings->SaveSettings();
+#endif
 
 		GConfig->SetBool(TEXT("RailOptima"), TEXT("bHardwareBenchmarkCompleted"), true, GGameIni);
 		GConfig->Flush(false, GGameIni);
@@ -63,6 +68,7 @@ void URailSettingsManager::InitializeSettings(bool bForceBenchmark)
 		Settings->ApplySettings(false);
 	}
 }
+
 
 void URailSettingsManager::ApplyQualityPreset(int32 PresetLevel)
 {
