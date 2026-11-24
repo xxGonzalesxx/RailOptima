@@ -49,3 +49,4 @@ Frontend/src/api/generated/
 # ---- Load testing ----
 k6-results/
 load-test-results/
+Backend/keys/
