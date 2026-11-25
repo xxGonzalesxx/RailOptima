@@ -4,13 +4,12 @@ package api.llm.client;
 import api.llm.config.GigaChatConfig;
 import api.llm.config.GigaChatHttpClientFactory;
 import api.llm.config.GigaChatTokenProvider;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
@@ -65,14 +64,14 @@ public class GigaChatClient {
             JsonNode content = json.at("/choices/0/message/content");
 
             if (content.isMissingNode()
-                    || !content.isTextual()
-                    || content.asText().isBlank()) {
+                    || !content.isString()
+                    || content.asString().isBlank()) {
                 throw new IllegalStateException(
                         "GigaChat API вернул ответ без текста"
                 );
             }
 
-            return content.asText();
+            return content.asString();
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

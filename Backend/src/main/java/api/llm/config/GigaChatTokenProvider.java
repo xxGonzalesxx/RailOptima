@@ -1,10 +1,10 @@
 
 package api.llm.config;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -83,8 +83,8 @@ public class GigaChatTokenProvider {
             JsonNode accessToken = json.get("access_token");
 
             if (accessToken == null
-                    || !accessToken.isTextual()
-                    || accessToken.asText().isBlank()) {
+                    || !accessToken.isString()
+                    || accessToken.asString().isBlank()) {
                 throw new IllegalStateException(
                         "GigaChat OAuth не вернул access_token"
                 );
@@ -95,7 +95,7 @@ public class GigaChatTokenProvider {
                     ? json.get("expires_at").asLong()
                     : now + DEFAULT_TOKEN_LIFETIME_MS;
 
-            cachedAccessToken = accessToken.asText();
+            cachedAccessToken = accessToken.asString();
             tokenExpiryTime = Math.max(
                     now,
                     expiryTime - TOKEN_REFRESH_MARGIN_MS
