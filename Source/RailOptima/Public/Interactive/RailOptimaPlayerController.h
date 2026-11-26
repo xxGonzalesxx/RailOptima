@@ -69,6 +69,7 @@ private:
 	void HandlePrimaryReleased();
 	void HandleEscapePressed();
 	void HandleProfileToggle();
+	void HandleToggleEndpoints();
 	void HandleSecondaryPressed();
 	void HandleBrushModeToggle();
 	void HandleBrushRadiusDecrease();

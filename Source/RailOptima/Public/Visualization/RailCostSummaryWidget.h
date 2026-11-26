@@ -40,7 +40,18 @@ public:
 		float		   InMinRadius_m,
 		double		   InTime_ms);
 
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|UI")
+	void UpdateEndpointsToggleState(bool bVisible);
+
 private:
+	UFUNCTION()
+	void HandleToggleEndpointsClicked();
+
+	UPROPERTY()
+	TObjectPtr<class UButton> EndpointsToggleBtn;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> EndpointsToggleText;
 	UPROPERTY()
 	TObjectPtr<UTextBlock> CategoryValueText;
 

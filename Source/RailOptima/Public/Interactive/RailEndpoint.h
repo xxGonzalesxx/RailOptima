@@ -58,11 +58,11 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Endpoint",
 		meta = (ClampMin = "500.0", ClampMax = "100000.0"))
-	float SphereRadius_cm = 8000.0f;
+	float SphereRadius_cm = 12000.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Endpoint",
-		meta = (ClampMin = "0.0", ClampMax = "100000.0"))
-	float TerrainZOffset_cm = 8000.0f;
+		meta = (ClampMin = "0.0", ClampMax = "1000000.0"))
+	float TerrainZOffset_cm = 40000.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Endpoint")
 	TObjectPtr<UMaterialInterface> EndpointMaterial;

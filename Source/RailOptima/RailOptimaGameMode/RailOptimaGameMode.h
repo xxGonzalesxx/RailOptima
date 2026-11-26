@@ -129,6 +129,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "RailOptima|Endpoints")
 	ARailEndpoint* GetEndEndpoint() const { return EndEndpoint; }
 
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Endpoints")
+	void ToggleEndpointsVisibility();
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Endpoints")
+	bool AreEndpointsVisible() const { return bEndpointsVisible; }
+
 	// ─────────────────────────────────────────────────────────────────
 	//  Зоны и интерактивная кисть
 	// ─────────────────────────────────────────────────────────────────
@@ -322,6 +328,8 @@ private:
 
 	UPROPERTY()
 	TArray<TObjectPtr<ARailEndpoint>> Waypoints;
+
+	bool bEndpointsVisible = true;
 
 	bool bBrushModeActive = false;
 	ERailZoneType ActiveZoneType = ERailZoneType::ForbiddenRed;

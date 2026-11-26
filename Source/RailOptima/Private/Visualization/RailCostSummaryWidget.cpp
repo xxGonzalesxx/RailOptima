@@ -4,6 +4,7 @@
 #include "Visualization/RailCostSummaryWidget.h"
 #include "Blueprint/WidgetTree.h"
 #include "Components/Border.h"
+#include "Components/Button.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
 #include "Components/HorizontalBox.h"
@@ -12,6 +13,8 @@
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Kismet/GameplayStatics.h"
+#include "RailOptimaGameMode/RailOptimaGameMode.h"
 #include "Styling/CoreStyle.h"
 
 TSharedRef<SWidget> URailCostSummaryWidget::RebuildWidget()
@@ -86,9 +89,111 @@ TSharedRef<SWidget> URailCostSummaryWidget::RebuildWidget()
 		AddRow(TEXT("Макс. уклон / Мин. радиус:"), ProfileValueText, FLinearColor(1.0f, 0.85f, 0.35f, 1.0f), 11, false);
 		AddRow(TEXT("ИТОГОВАЯ СТОИМОСТЬ:"), TotalCostValueText, FLinearColor(0.2f, 0.95f, 0.4f, 1.0f), 15, true);
 		AddRow(TEXT("Время расчёта:"), CalcTimeValueText, FLinearColor(0.55f, 0.6f, 0.65f, 1.0f), 10, false);
+
+		// Разделитель
+		USpacer* Sep1 = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
+		Sep1->SetSize(FVector2D(1.0f, 10.0f));
+		MainVBox->AddChildToVerticalBox(Sep1);
+
+		// Кнопка-тагл видимости станций (H)
+		EndpointsToggleBtn = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("EndpointsToggleBtn"));
+		FButtonStyle BtnStyle;
+		BtnStyle.Normal.TintColor = FSlateColor(FLinearColor(0.08f, 0.22f, 0.38f, 0.9f));
+		BtnStyle.Hovered.TintColor = FSlateColor(FLinearColor(0.12f, 0.35f, 0.58f, 1.0f));
+		BtnStyle.Pressed.TintColor = FSlateColor(FLinearColor(0.05f, 0.16f, 0.28f, 1.0f));
+		EndpointsToggleBtn->SetStyle(BtnStyle);
+		EndpointsToggleBtn->OnClicked.AddDynamic(this, &URailCostSummaryWidget::HandleToggleEndpointsClicked);
+
+		if (UVerticalBoxSlot* BtnSlot = MainVBox->AddChildToVerticalBox(EndpointsToggleBtn))
+		{
+			BtnSlot->SetPadding(FMargin(0.0f, 2.0f, 0.0f, 8.0f));
+		}
+
+		EndpointsToggleText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("EndpointsToggleText"));
+		EndpointsToggleText->SetText(FText::FromString(TEXT("👁  Скрыть станции (H)")));
+		EndpointsToggleText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 10));
+		EndpointsToggleText->SetColorAndOpacity(FSlateColor(FLinearColor(0.85f, 0.92f, 1.0f, 1.0f)));
+		EndpointsToggleText->SetJustification(ETextJustify::Center);
+		EndpointsToggleBtn->SetContent(EndpointsToggleText);
+
+		// Разделитель
+		USpacer* Sep2 = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
+		Sep2->SetSize(FVector2D(1.0f, 6.0f));
+		MainVBox->AddChildToVerticalBox(Sep2);
+
+		// Заголовок подсказки по управлению
+		UTextBlock* HelpHeader = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+		HelpHeader->SetText(FText::FromString(TEXT("УПРАВЛЕНИЕ И ГОРЯЧИЕ КЛАВИШИ:")));
+		HelpHeader->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 10));
+		HelpHeader->SetColorAndOpacity(FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f)));
+		if (UVerticalBoxSlot* HdrSlot = MainVBox->AddChildToVerticalBox(HelpHeader))
+		{
+			HdrSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 4.0f));
+		}
+
+		auto AddHelpRow = [&](const FString& KeyStr, const FString& ActionStr) {
+			UHorizontalBox* HelpBox = WidgetTree->ConstructWidget<UHorizontalBox>(UHorizontalBox::StaticClass());
+			if (UVerticalBoxSlot* HVSlot = MainVBox->AddChildToVerticalBox(HelpBox))
+			{
+				HVSlot->SetPadding(FMargin(0.0f, 1.5f));
+			}
+
+			UTextBlock* KeyBlock = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+			KeyBlock->SetText(FText::FromString(KeyStr));
+			KeyBlock->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 9));
+			KeyBlock->SetColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.85f, 0.45f, 1.0f)));
+			if (UHorizontalBoxSlot* KSlot = HelpBox->AddChildToHorizontalBox(KeyBlock))
+			{
+				KSlot->SetSize(FSlateChildSize(ESlateSizeRule::Automatic));
+				KSlot->SetVerticalAlignment(VAlign_Center);
+			}
+
+			USpacer* Spc = WidgetTree->ConstructWidget<USpacer>(USpacer::StaticClass());
+			Spc->SetSize(FVector2D(12.0f, 1.0f));
+			HelpBox->AddChildToHorizontalBox(Spc);
+
+			UTextBlock* ActBlock = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+			ActBlock->SetText(FText::FromString(ActionStr));
+			ActBlock->SetFont(FCoreStyle::GetDefaultFontStyle("Regular", 9));
+			ActBlock->SetColorAndOpacity(FSlateColor(FLinearColor(0.75f, 0.80f, 0.88f, 1.0f)));
+			if (UHorizontalBoxSlot* ASlot = HelpBox->AddChildToHorizontalBox(ActBlock))
+			{
+				ASlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
+				ASlot->SetHorizontalAlignment(HAlign_Right);
+				ASlot->SetVerticalAlignment(VAlign_Center);
+			}
+		};
+
+		AddHelpRow(TEXT("WASD / Shift"), TEXT("Полет / Ускорение камеры"));
+		AddHelpRow(TEXT("ПКМ (зажать)"), TEXT("Свободный обзор"));
+		AddHelpRow(TEXT("Space / Ctrl"), TEXT("Подъём / Спуск камеры"));
+		AddHelpRow(TEXT("Колесо мыши"), TEXT("Зум / Высота Top-Down"));
+		AddHelpRow(TEXT("ЛКМ (зажать)"), TEXT("Перемещение станции (400м)"));
+		AddHelpRow(TEXT("ЛКМ (x2 на пути)"), TEXT("Добавить контрольную точку"));
+		AddHelpRow(TEXT("ПКМ (по точке)"), TEXT("Удалить контрольную точку"));
+		AddHelpRow(TEXT("H"), TEXT("Скрыть / Показать станции"));
+		AddHelpRow(TEXT("F1"), TEXT("Продольный профиль высот"));
+		AddHelpRow(TEXT("B / [ / ]"), TEXT("Кисть зон / Радиус"));
+		AddHelpRow(TEXT("Esc"), TEXT("Меню настроек и смета"));
 	}
 
 	return Super::RebuildWidget();
+}
+
+void URailCostSummaryWidget::HandleToggleEndpointsClicked()
+{
+	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		GM->ToggleEndpointsVisibility();
+	}
+}
+
+void URailCostSummaryWidget::UpdateEndpointsToggleState(bool bVisible)
+{
+	if (EndpointsToggleText)
+	{
+		EndpointsToggleText->SetText(FText::FromString(bVisible ? TEXT("👁  Скрыть станции (H)") : TEXT("👁  Показать станции (H)")));
+	}
 }
 
 FString URailCostSummaryWidget::FormatMoneyRubles(double InCost_kRub)

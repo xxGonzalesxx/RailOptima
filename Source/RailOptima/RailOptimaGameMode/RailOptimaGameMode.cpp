@@ -402,7 +402,7 @@ void ARailOptimaGameMode::OpenProject(const FRailProjectMetadata& InProject)
 			const FVector2D S2D(MapSize_cm * 0.2f, MapSize_cm * 0.2f);
 			float StartZ = 0.0f;
 			if (Terrain) Terrain->SampleTerrainZ_cm(S2D, StartZ);
-			StartEndpoint->SetActorLocation(FVector(S2D.X, S2D.Y, StartZ + 8000.0f));
+			StartEndpoint->SetActorLocation(FVector(S2D.X, S2D.Y, StartZ + StartEndpoint->TerrainZOffset_cm));
 		}
 	}
 
@@ -418,7 +418,7 @@ void ARailOptimaGameMode::OpenProject(const FRailProjectMetadata& InProject)
 			const FVector2D E2D(MapSize_cm * 0.8f, MapSize_cm * 0.8f);
 			float EndZ = 0.0f;
 			if (Terrain) Terrain->SampleTerrainZ_cm(E2D, EndZ);
-			EndEndpoint->SetActorLocation(FVector(E2D.X, E2D.Y, EndZ + 8000.0f));
+			EndEndpoint->SetActorLocation(FVector(E2D.X, E2D.Y, EndZ + EndEndpoint->TerrainZOffset_cm));
 		}
 	}
 
@@ -446,6 +446,15 @@ void ARailOptimaGameMode::OpenProject(const FRailProjectMetadata& InProject)
 	if (PauseMenuWidget)
 	{
 		PauseMenuWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+	{
+		PC->bShowMouseCursor = true;
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		InputMode.SetHideCursorDuringCapture(false);
+		PC->SetInputMode(InputMode);
 	}
 
 	ShowToast(FString::Printf(TEXT("Проект '%s' успешно загружен"), *InProject.ProjectName), ERailToastType::Success);
@@ -861,6 +870,34 @@ void ARailOptimaGameMode::SetupEndpoints()
 		StartEndpoint->OnEndpointMoved.AddDynamic(this, &ARailOptimaGameMode::HandleEndpointMoved);
 	if (EndEndpoint)
 		EndEndpoint->OnEndpointMoved.AddDynamic(this, &ARailOptimaGameMode::HandleEndpointMoved);
+}
+
+void ARailOptimaGameMode::ToggleEndpointsVisibility()
+{
+	bEndpointsVisible = !bEndpointsVisible;
+
+	if (StartEndpoint)
+	{
+		StartEndpoint->SetActorHiddenInGame(!bEndpointsVisible);
+	}
+	if (EndEndpoint)
+	{
+		EndEndpoint->SetActorHiddenInGame(!bEndpointsVisible);
+	}
+	for (ARailEndpoint* WP : Waypoints)
+	{
+		if (IsValid(WP))
+		{
+			WP->SetActorHiddenInGame(!bEndpointsVisible);
+		}
+	}
+
+	if (CostSummaryWidget)
+	{
+		CostSummaryWidget->UpdateEndpointsToggleState(bEndpointsVisible);
+	}
+
+	ShowToast(bEndpointsVisible ? TEXT("Станции и маркеры: Отображаются") : TEXT("Станции и маркеры: Скрыты"), ERailToastType::Info, 2.5f);
 }
 
 void ARailOptimaGameMode::RecomputePath()

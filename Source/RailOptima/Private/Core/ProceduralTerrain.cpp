@@ -24,7 +24,7 @@ AProceduralTerrain::AProceduralTerrain()
 		CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("TerrainMesh"));
 	RootComponent = TerrainMesh;
 
-	TerrainMesh->bUseAsyncCooking = true;
+	TerrainMesh->bUseAsyncCooking = false;
 	TerrainMesh->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	TerrainMesh->bUseComplexAsSimpleCollision = true;
 	TerrainMesh->SetCollisionObjectType(ECC_WorldStatic);

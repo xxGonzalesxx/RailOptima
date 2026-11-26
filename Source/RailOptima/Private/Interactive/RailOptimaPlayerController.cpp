@@ -7,6 +7,7 @@
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
 #include "Core/ProceduralTerrain.h"
+#include "ProceduralMeshComponent.h"
 #include "Engine/EngineTypes.h"
 #include "Engine/World.h"
 #include "EnhancedInputSubsystems.h"
@@ -93,6 +94,7 @@ void ARailOptimaPlayerController::SetupInputComponent()
 
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ARailOptimaPlayerController::HandleEscapePressed);
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &ARailOptimaPlayerController::HandleProfileToggle);
+		InputComponent->BindKey(EKeys::H, IE_Pressed, this, &ARailOptimaPlayerController::HandleToggleEndpoints);
 		InputComponent->BindKey(EKeys::B, IE_Pressed, this, &ARailOptimaPlayerController::HandleBrushModeToggle);
 		InputComponent->BindKey(EKeys::LeftBracket, IE_Pressed, this, &ARailOptimaPlayerController::HandleBrushRadiusDecrease);
 		InputComponent->BindKey(EKeys::RightBracket, IE_Pressed, this, &ARailOptimaPlayerController::HandleBrushRadiusIncrease);
@@ -112,6 +114,14 @@ void ARailOptimaPlayerController::HandleProfileToggle()
 	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
 	{
 		GM->ToggleProfileWidget();
+	}
+}
+
+void ARailOptimaPlayerController::HandleToggleEndpoints()
+{
+	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		GM->ToggleEndpointsVisibility();
 	}
 }
 
@@ -465,23 +475,67 @@ bool ARailOptimaPlayerController::TraceTerrainUnderCursor(FVector& OutHitLocatio
 		return true;
 	}
 
-	// Fallback при промахе по коллизии меша: математическое пересечение луча камеры с картой высот
-	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
+	// Fallback при промахе по коллизии меша: прямое сканирование меша и итеративный луч по карте высот
+	ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this));
+	AProceduralTerrain* Terrain = GM ? GM->GetTerrain() : nullptr;
+	if (!Terrain)
 	{
-		if (AProceduralTerrain* Terrain = GM->GetTerrain())
+		TArray<AActor*> Found;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), AProceduralTerrain::StaticClass(), Found);
+		if (Found.Num() > 0)
 		{
-			if (FMath::Abs(WorldDir.Z) > 1e-4f)
+			Terrain = Cast<AProceduralTerrain>(Found[0]);
+		}
+	}
+
+	if (Terrain)
+	{
+		// 1. Прямой тест по компоненту ProceduralMesh (работает без ожидания глобальной физики)
+		if (Terrain->GetTerrainMesh())
+		{
+			FHitResult CompHit;
+			FCollisionQueryParams CompParams(SCENE_QUERY_STAT(RailTerrainCompTrace), /*bTraceComplex=*/true);
+			CompParams.AddIgnoredActor(GetPawn());
+			if (Terrain->GetTerrainMesh()->LineTraceComponent(CompHit, WorldOrigin, End, CompParams))
 			{
-				const float T = -WorldOrigin.Z / WorldDir.Z;
-				if (T > 0.0f)
+				OutHitLocation = CompHit.ImpactPoint;
+				return true;
+			}
+		}
+
+		// 2. Итеративное математическое нахождение пересечения луча курсора с ландшафтом
+		if (FMath::Abs(WorldDir.Z) > 1e-4f)
+		{
+			float TargetZ = 0.0f;
+			float T = (TargetZ - WorldOrigin.Z) / WorldDir.Z;
+			if (T > 0.0f)
+			{
+				for (int32 Iter = 0; Iter < 5; ++Iter)
 				{
-					const FVector IntersectPoint = WorldOrigin + WorldDir * T;
-					float SampledZ = 0.0f;
-					if (Terrain->SampleTerrainZ_cm(FVector2D(IntersectPoint.X, IntersectPoint.Y), SampledZ))
+					const FVector P = WorldOrigin + WorldDir * T;
+					float TerrainZ = 0.0f;
+					if (Terrain->SampleTerrainZ_cm(FVector2D(P.X, P.Y), TerrainZ))
 					{
-						OutHitLocation = FVector(IntersectPoint.X, IntersectPoint.Y, SampledZ);
-						return true;
+						TargetZ = TerrainZ;
+						T = (TargetZ - WorldOrigin.Z) / WorldDir.Z;
 					}
+					else
+					{
+						break;
+					}
+				}
+
+				const FVector FinalPoint = WorldOrigin + WorldDir * T;
+				float FinalZ = 0.0f;
+				if (Terrain->SampleTerrainZ_cm(FVector2D(FinalPoint.X, FinalPoint.Y), FinalZ))
+				{
+					OutHitLocation = FVector(FinalPoint.X, FinalPoint.Y, FinalZ);
+					return true;
+				}
+				else
+				{
+					OutHitLocation = FinalPoint;
+					return true;
 				}
 			}
 		}
