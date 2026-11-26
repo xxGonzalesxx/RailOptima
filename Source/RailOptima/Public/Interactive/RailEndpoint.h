@@ -51,6 +51,9 @@ public:
 	bool bIsStart = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Endpoint")
+	bool bIsWaypoint = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Endpoint")
 	FLinearColor EndpointColor = FLinearColor(0.1f, 0.9f, 0.1f, 1.0f);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "RailOptima|Endpoint",
@@ -87,16 +90,28 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Endpoint")
 	void SetHighlighted(bool bHighlighted);
 
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Endpoint")
+	void SetCustomColor(const FLinearColor& NewColor);
+
 	// Установить масштаб маркера. Радиус сферы = BaseSphereRadius_cm * InScale.
 	// Вызывается GameMode'ом при изменении высоты TopDown-камеры.
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Endpoint")
-	void SetViewScale(float InScale);
+	void SetViewScale(float InScale, bool bForce = false);
 
 	UFUNCTION(BlueprintPure, Category = "RailOptima|Endpoint")
 	float GetViewScale() const { return ViewScale; }
 
 	UFUNCTION(BlueprintPure, Category = "RailOptima|Endpoint")
+	float GetBaseSphereRadius() const { return BaseSphereRadius_cm > 0.0f ? BaseSphereRadius_cm : SphereRadius_cm; }
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Endpoint")
+	void SetBaseSphereRadius(float InBase) { BaseSphereRadius_cm = InBase; }
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Endpoint")
 	USphereComponent* GetCollisionSphere() const { return CollisionSphere; }
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Endpoint")
+	UStaticMeshComponent* GetVisualMesh() const { return VisualMesh; }
 
 private:
 	// ─────────────────────────────────────────────────────────────────
@@ -130,7 +145,7 @@ private:
 	float BaseSphereRadius_cm = 0.0f;
 
 	// Текущий масштаб вида.
-	float ViewScale = 1.0f;
+	float ViewScale = 10.0f;
 
 	static constexpr float MinViewScale = 10.0f;
 	static constexpr float MaxViewScale = 100.0f;

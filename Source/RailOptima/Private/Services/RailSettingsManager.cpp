@@ -261,3 +261,101 @@ void URailSettingsManager::SaveSettings()
 		UE_LOG(LogTemp, Log, TEXT("[RailSettings] Настройки успешно применены и сохранены в GameUserSettings.ini"));
 	}
 }
+
+static const TCHAR* GVisualSettingsSection = TEXT("RailOptima.VisualSettings");
+
+void URailSettingsManager::SetCameraFlySpeed(float Value)
+{
+	if (GConfig)
+	{
+		GConfig->SetFloat(GVisualSettingsSection, TEXT("CameraFlySpeed"), Value, GGameIni);
+		GConfig->Flush(false, GGameIni);
+	}
+}
+
+float URailSettingsManager::GetCameraFlySpeed()
+{
+	float Value = 100000.0f; // 1000 м/с
+	if (GConfig)
+	{
+		GConfig->GetFloat(GVisualSettingsSection, TEXT("CameraFlySpeed"), Value, GGameIni);
+	}
+	return Value;
+}
+
+void URailSettingsManager::SetCameraShiftBoost(float Value)
+{
+	if (GConfig)
+	{
+		GConfig->SetFloat(GVisualSettingsSection, TEXT("CameraShiftBoost"), Value, GGameIni);
+		GConfig->Flush(false, GGameIni);
+	}
+}
+
+float URailSettingsManager::GetCameraShiftBoost()
+{
+	float Value = 4.0f;
+	if (GConfig)
+	{
+		GConfig->GetFloat(GVisualSettingsSection, TEXT("CameraShiftBoost"), Value, GGameIni);
+	}
+	return Value;
+}
+
+void URailSettingsManager::SetPathRibbonWidth(float Value)
+{
+	if (GConfig)
+	{
+		GConfig->SetFloat(GVisualSettingsSection, TEXT("PathRibbonWidth"), Value, GGameIni);
+		GConfig->Flush(false, GGameIni);
+	}
+}
+
+float URailSettingsManager::GetPathRibbonWidth()
+{
+	float Value = 4000.0f; // 40 м
+	if (GConfig)
+	{
+		GConfig->GetFloat(GVisualSettingsSection, TEXT("PathRibbonWidth"), Value, GGameIni);
+	}
+	return Value;
+}
+
+void URailSettingsManager::SetPathRibbonHeight(float Value)
+{
+	if (GConfig)
+	{
+		GConfig->SetFloat(GVisualSettingsSection, TEXT("PathRibbonHeight"), Value, GGameIni);
+		GConfig->Flush(false, GGameIni);
+	}
+}
+
+float URailSettingsManager::GetPathRibbonHeight()
+{
+	float Value = 8000.0f; // 80 м
+	if (GConfig)
+	{
+		GConfig->GetFloat(GVisualSettingsSection, TEXT("PathRibbonHeight"), Value, GGameIni);
+	}
+	return Value;
+}
+
+void URailSettingsManager::SetEndpointScaleMultiplier(float Value)
+{
+	if (GConfig)
+	{
+		GConfig->SetFloat(GVisualSettingsSection, TEXT("EndpointScaleMultiplier"), Value, GGameIni);
+		GConfig->Flush(false, GGameIni);
+	}
+}
+
+float URailSettingsManager::GetEndpointScaleMultiplier()
+{
+	float Value = 1.0f;
+	if (GConfig)
+	{
+		GConfig->GetFloat(GVisualSettingsSection, TEXT("EndpointScaleMultiplier"), Value, GGameIni);
+	}
+	return Value;
+}
+

@@ -13,6 +13,7 @@
 #include "InputMappingContext.h"
 #include "Interactive/RailEndpoint.h"
 #include "Interactive/RailSpectatorPawn.h"
+#include "DrawDebugHelpers.h"
 #include "Kismet/GameplayStatics.h"
 #include "RailOptimaGameMode/RailOptimaGameMode.h" // ← ИСПРАВЛЕНО
 
@@ -86,6 +87,11 @@ void ARailOptimaPlayerController::SetupInputComponent()
 	if (InputComponent)
 	{
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ARailOptimaPlayerController::HandleEscapePressed);
+		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &ARailOptimaPlayerController::HandleProfileToggle);
+		InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this, &ARailOptimaPlayerController::HandleSecondaryPressed);
+		InputComponent->BindKey(EKeys::B, IE_Pressed, this, &ARailOptimaPlayerController::HandleBrushModeToggle);
+		InputComponent->BindKey(EKeys::LeftBracket, IE_Pressed, this, &ARailOptimaPlayerController::HandleBrushRadiusDecrease);
+		InputComponent->BindKey(EKeys::RightBracket, IE_Pressed, this, &ARailOptimaPlayerController::HandleBrushRadiusIncrease);
 	}
 }
 
@@ -94,6 +100,14 @@ void ARailOptimaPlayerController::HandleEscapePressed()
 	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
 	{
 		GM->TogglePauseMenu();
+	}
+}
+
+void ARailOptimaPlayerController::HandleProfileToggle()
+{
+	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		GM->ToggleProfileWidget();
 	}
 }
 
@@ -117,9 +131,17 @@ void ARailOptimaPlayerController::CenterCameraOnTerrain()
 		if (Terrain)
 		{
 			const FRailHeightMapData& Map = Terrain->GetHeightMapData();
-			const float				  SideX_cm = Map.Width * static_cast<float>(Map.PixelSize_m) * 100.0f;
-			const float				  SideY_cm = Map.Height * static_cast<float>(Map.PixelSize_m) * 100.0f;
-			const float				  SideZ_cm = (Map.MaxElevation_m - Map.MinElevation_m) * 100.0f;
+			float SideX_cm = Map.Width * static_cast<float>(Map.PixelSize_m) * 100.0f;
+			float SideY_cm = Map.Height * static_cast<float>(Map.PixelSize_m) * 100.0f;
+			float SideZ_cm = (Map.MaxElevation_m - Map.MinElevation_m) * 100.0f;
+
+			if (SideX_cm <= 0.0f || SideY_cm <= 0.0f)
+			{
+				const float MapMeters = Terrain->GetMapSizeMeters();
+				SideX_cm = (MapMeters > 0.0f ? MapMeters : 15360.0f) * 100.0f;
+				SideY_cm = (MapMeters > 0.0f ? MapMeters : 15360.0f) * 100.0f;
+				SideZ_cm = 50000.0f;
+			}
 
 			SubscribedPawn->CenterOnWorld(SideX_cm, SideY_cm, SideZ_cm);
 
@@ -144,6 +166,31 @@ void ARailOptimaPlayerController::PlayerTick(float DeltaTime)
 	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
 	{
 		GM->ApplyViewScaleFromCamera(SubscribedPawn);
+	}
+
+	// ── Режим кисти зон: динамический индикатор радиуса и непрерывное рисование ──
+	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		if (GM->IsBrushModeActive())
+		{
+			FVector HitLocation;
+			if (TraceTerrainUnderCursor(HitLocation))
+			{
+				const float Radius_cm = GM->GetBrushRadius_m() * 100.0f;
+				const FColor CircleColor = (GM->GetActiveZoneType() == ERailZoneType::Eraser)
+					? FColor(240, 240, 240)
+					: FColor(255, 30, 30);
+
+				DrawDebugCircle(GetWorld(), HitLocation + FVector(0.0f, 0.0f, 30.0f), Radius_cm, 64, CircleColor, false, -1.0f, 0, 160.0f, FVector(1, 0, 0), FVector(0, 1, 0));
+				DrawDebugPoint(GetWorld(), HitLocation + FVector(0.0f, 0.0f, 30.0f), 14.0f, CircleColor, false, -1.0f);
+
+				if (bIsPaintingBrush)
+				{
+					GM->PaintZoneAtLocation(HitLocation);
+				}
+			}
+			return;
+		}
 	}
 
 	// ── Тащим маркер ─────────────────────────────────────────────
@@ -181,17 +228,46 @@ void ARailOptimaPlayerController::PlayerTick(float DeltaTime)
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  Логика ЛКМ
+//  Логика ЛКМ и ПКМ
 // ─────────────────────────────────────────────────────────────────
 
 void ARailOptimaPlayerController::HandlePrimaryPressed()
 {
-	UE_LOG(LogTemp, Log, TEXT("[RailPC] Primary Pressed — ищу маркер под курсором."));
+	ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this));
+
+	// Если включен режим кисти — начинаем непрерывное рисование зоны
+	if (GM && GM->IsBrushModeActive())
+	{
+		bIsPaintingBrush = true;
+		FVector HitLocation;
+		if (TraceTerrainUnderCursor(HitLocation))
+		{
+			GM->PaintZoneAtLocation(HitLocation);
+		}
+		return;
+	}
 
 	ARailEndpoint* Marker = PickEndpointUnderCursor();
 	if (!Marker)
 	{
-		UE_LOG(LogTemp, Log, TEXT("[RailPC] ЛКМ: маркер под курсором НЕ найден."));
+		// Проверка двойного клика ЛКМ на полотне трассы для создания Waypoint
+		const double Now = FPlatformTime::Seconds();
+		FVector2D MousePos;
+		GetMousePosition(MousePos.X, MousePos.Y);
+
+		if ((Now - LastLmbClickTime) < 0.38 && FVector2D::Distance(MousePos, LastLmbClickPos) < 25.0f)
+		{
+			FVector HitLocation;
+			if (TraceTerrainUnderCursor(HitLocation) && GM)
+			{
+				GM->TryAddWaypointNearLocation(HitLocation);
+			}
+			LastLmbClickTime = 0.0;
+			return;
+		}
+
+		LastLmbClickTime = Now;
+		LastLmbClickPos = MousePos;
 		return;
 	}
 
@@ -208,9 +284,18 @@ void ARailOptimaPlayerController::HandlePrimaryPressed()
 
 void ARailOptimaPlayerController::HandlePrimaryReleased()
 {
+	if (bIsPaintingBrush)
+	{
+		bIsPaintingBrush = false;
+		if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
+		{
+			GM->RecomputePath();
+		}
+		return;
+	}
+
 	if (!DraggedEndpoint)
 	{
-		UE_LOG(LogTemp, Verbose, TEXT("[RailPC] Primary Released, но ничего не тащим."));
 		return;
 	}
 
@@ -224,6 +309,48 @@ void ARailOptimaPlayerController::HandlePrimaryReleased()
 	DraggedEndpoint->SetHighlighted(false);
 	DraggedEndpoint = nullptr;
 	HoveredEndpoint = nullptr;
+}
+
+void ARailOptimaPlayerController::HandleSecondaryPressed()
+{
+	ARailEndpoint* Marker = PickEndpointUnderCursor();
+	if (Marker && Marker->bIsWaypoint)
+	{
+		if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
+		{
+			GM->RemoveWaypoint(Marker);
+		}
+	}
+}
+
+void ARailOptimaPlayerController::HandleBrushModeToggle()
+{
+	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		GM->ToggleBrushMode();
+	}
+}
+
+void ARailOptimaPlayerController::HandleBrushRadiusDecrease()
+{
+	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		if (GM->IsBrushModeActive())
+		{
+			GM->SetBrushRadius_m(GM->GetBrushRadius_m() - 25.0f);
+		}
+	}
+}
+
+void ARailOptimaPlayerController::HandleBrushRadiusIncrease()
+{
+	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		if (GM->IsBrushModeActive())
+		{
+			GM->SetBrushRadius_m(GM->GetBrushRadius_m() + 25.0f);
+		}
+	}
 }
 
 // ─────────────────────────────────────────────────────────────────

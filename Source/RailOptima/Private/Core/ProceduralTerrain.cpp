@@ -124,6 +124,18 @@ bool AProceduralTerrain::BuildFromHeightmap(const FString& InHeightMapPath)
 	{
 		TerrainMesh->SetMaterial(0, TerrainMaterial);
 	}
+	else
+	{
+		UMaterialInterface* FallbackMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/EngineDebugMaterials/VertexColorMaterial.VertexColorMaterial"));
+		if (!FallbackMat)
+		{
+			FallbackMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+		}
+		if (FallbackMat)
+		{
+			TerrainMesh->SetMaterial(0, FallbackMat);
+		}
+	}
 
 	UE_LOG(LogTemp, Log,
 		TEXT("[ProceduralTerrain] Рельеф построен: %dx%d, шаг=%.2f м."),

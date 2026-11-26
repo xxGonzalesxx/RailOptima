@@ -11,12 +11,14 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "ProceduralMeshComponent.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
 
 // ─────────────────────────────────────────────────────────────────
 //  Жизненный цикл
@@ -34,6 +36,15 @@ ARoadRenderer::ARoadRenderer()
 	RoadMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	RoadMesh->SetCastShadow(false);
 	RoadMesh->bUseAsyncCooking = false;
+
+	RiverColor = FLinearColor(0.04f, 0.48f, 0.98f, 1.0f);
+
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> MatFinder(
+		TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	if (MatFinder.Succeeded())
+	{
+		RoadMaterial = MatFinder.Object;
+	}
 }
 
 void ARoadRenderer::BeginPlay()
@@ -231,9 +242,26 @@ bool ARoadRenderer::LoadAndBuild(const FString& InGeoJsonPath)
 
 	FlushSection();
 
+	UMaterialInstanceDynamic* DynMat = nullptr;
 	if (RoadMaterial)
 	{
-		RoadMesh->SetMaterial(0, RoadMaterial);
+		DynMat = UMaterialInstanceDynamic::Create(RoadMaterial, this);
+		if (DynMat)
+		{
+			DynMat->SetVectorParameterValue(TEXT("BaseColor"), Color);
+		}
+	}
+
+	for (int32 s = 0; s < SectionsCreated; ++s)
+	{
+		if (DynMat)
+		{
+			RoadMesh->SetMaterial(s, DynMat);
+		}
+		else if (RoadMaterial)
+		{
+			RoadMesh->SetMaterial(s, RoadMaterial);
+		}
 	}
 
 	if (bLogStats)
@@ -428,6 +456,71 @@ bool ARoadRenderer::ParseGeoJson(const FString& InRawJson,
 				}
 				if (Line.Num() >= 2)
 					OutLines.Add(MoveTemp(Line));
+			}
+		}
+		else if (GeomType == TEXT("Polygon"))
+		{
+			// Водоемы, озера, широкие реки: извлекаем внешние контуры (LinearRing)
+			const TArray<TSharedPtr<FJsonValue>>* PolyRings = nullptr;
+			if ((*GeometryObj)->TryGetArrayField(TEXT("coordinates"), PolyRings) && PolyRings)
+			{
+				for (const TSharedPtr<FJsonValue>& RingValue : *PolyRings)
+				{
+					const TArray<TSharedPtr<FJsonValue>>* RingCoords = nullptr;
+					if (!RingValue->TryGetArray(RingCoords) || !RingCoords)
+						continue;
+
+					TArray<FVector2D> RingLine;
+					for (const TSharedPtr<FJsonValue>& CoordValue : *RingCoords)
+					{
+						const TArray<TSharedPtr<FJsonValue>>* Pair = nullptr;
+						if (!CoordValue->TryGetArray(Pair) || !Pair || Pair->Num() < 2)
+							continue;
+						const double Lon = (*Pair)[0]->AsNumber();
+						const double Lat = (*Pair)[1]->AsNumber();
+						RingLine.Add(FVector2D(Lat, Lon));
+					}
+					if (RingLine.Num() >= 3)
+					{
+						OutLines.Add(MoveTemp(RingLine));
+					}
+				}
+			}
+		}
+		else if (GeomType == TEXT("MultiPolygon"))
+		{
+			// Группы водоемов
+			const TArray<TSharedPtr<FJsonValue>>* MultiPolys = nullptr;
+			if ((*GeometryObj)->TryGetArrayField(TEXT("coordinates"), MultiPolys) && MultiPolys)
+			{
+				for (const TSharedPtr<FJsonValue>& PolyVal : *MultiPolys)
+				{
+					const TArray<TSharedPtr<FJsonValue>>* PolyRings = nullptr;
+					if (!PolyVal->TryGetArray(PolyRings) || !PolyRings)
+						continue;
+
+					for (const TSharedPtr<FJsonValue>& RingValue : *PolyRings)
+					{
+						const TArray<TSharedPtr<FJsonValue>>* RingCoords = nullptr;
+						if (!RingValue->TryGetArray(RingCoords) || !RingCoords)
+							continue;
+
+						TArray<FVector2D> RingLine;
+						for (const TSharedPtr<FJsonValue>& CoordValue : *RingCoords)
+						{
+							const TArray<TSharedPtr<FJsonValue>>* Pair = nullptr;
+							if (!CoordValue->TryGetArray(Pair) || !Pair || Pair->Num() < 2)
+								continue;
+							const double Lon = (*Pair)[0]->AsNumber();
+							const double Lat = (*Pair)[1]->AsNumber();
+							RingLine.Add(FVector2D(Lat, Lon));
+						}
+						if (RingLine.Num() >= 3)
+						{
+							OutLines.Add(MoveTemp(RingLine));
+						}
+					}
+				}
 			}
 		}
 	}

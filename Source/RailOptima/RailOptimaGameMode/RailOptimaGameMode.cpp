@@ -17,16 +17,25 @@
 #include "Kismet/GameplayStatics.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "ProceduralMeshComponent.h"
+#include "Services/RailCrashReporter.h"
 #include "Services/RailProjectManager.h"
 #include "TimerManager.h"
 #include "UI/RailMainMenuWidget.h"
 #include "UI/RailPauseMenuWidget.h"
 #include "UI/RailGraphicsSettingsWidget.h"
+#include "UI/RailBrushWidget.h"
+#include "UI/RailProfileWidget.h"
+#include "Visualization/RailZoneOverlayRenderer.h"
 #include "Services/RailSettingsManager.h"
 #include "UI/RailToastWidget.h"
 #include "Visualization/PathRenderer.h"
 #include "Visualization/RailCostSummaryWidget.h"
 #include "Visualization/RoadRenderer.h"
+#include "Engine/DirectionalLight.h"
+#include "Components/DirectionalLightComponent.h"
+#include "Engine/SkyLight.h"
+#include "Components/SkyLightComponent.h"
 
 ARailOptimaGameMode::ARailOptimaGameMode()
 {
@@ -38,9 +47,11 @@ ARailOptimaGameMode::ARailOptimaGameMode()
 void ARailOptimaGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+	EnsureDefaultEnvironment();
 	SetupSubsystems();
 	FindTerrain();
 	SetupPathRenderer();
+	SetupZoneOverlayRenderer();
 	SetupEndpoints();
 	SetupCostSummaryWidget();
 
@@ -62,6 +73,8 @@ void ARailOptimaGameMode::BeginPlay()
 	SetupGlobalToastWidget();
 	SetupGraphicsSettingsWidget();
 	SetupPauseMenuWidget();
+	SetupProfileWidget();
+	LoadAndApplyVisualSettingsFromConfig();
 	SetupMainMenuWidget();
 }
 
@@ -140,6 +153,92 @@ void ARailOptimaGameMode::SetupPauseMenuWidget()
 		PauseMenuWidget->OnSaveProjectClicked.AddDynamic(this, &ARailOptimaGameMode::HandlePauseSave);
 		PauseMenuWidget->OnExportExcelClicked.AddDynamic(this, &ARailOptimaGameMode::HandlePauseExportExcel);
 		PauseMenuWidget->OnReturnToMainMenuClicked.AddDynamic(this, &ARailOptimaGameMode::HandlePauseReturnToMenu);
+		PauseMenuWidget->OnVisualSettingsApplied.AddDynamic(this, &ARailOptimaGameMode::ApplyVisualAndCameraSettings);
+	}
+}
+
+void ARailOptimaGameMode::SetupProfileWidget()
+{
+	if (ProfileWidget)
+		return;
+
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (!PC)
+		return;
+
+	ProfileWidget = CreateWidget<URailProfileWidget>(PC, URailProfileWidget::StaticClass());
+	if (ProfileWidget)
+	{
+		ProfileWidget->AddToViewport(35);
+		ProfileWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void ARailOptimaGameMode::ToggleProfileWidget()
+{
+	if (!ProfileWidget)
+	{
+		SetupProfileWidget();
+	}
+	if (ProfileWidget)
+	{
+		ProfileWidget->ToggleVisibilityCustom();
+	}
+}
+
+void ARailOptimaGameMode::LoadAndApplyVisualSettingsFromConfig()
+{
+	const float FlySpeed = URailSettingsManager::GetCameraFlySpeed();
+	const float BoostMult = URailSettingsManager::GetCameraShiftBoost();
+	const float RibbonWidth = URailSettingsManager::GetPathRibbonWidth();
+	const float RibbonHeight = URailSettingsManager::GetPathRibbonHeight();
+	const float EndpointScale = URailSettingsManager::GetEndpointScaleMultiplier();
+
+	ApplyVisualAndCameraSettings(FlySpeed, BoostMult, RibbonWidth, RibbonHeight, EndpointScale);
+}
+
+void ARailOptimaGameMode::ApplyVisualAndCameraSettings(float FlySpeed_cmps, float BoostMultiplier, float PathWidth_cm, float PathHeight_cm, float EndpointScale)
+{
+	// 1. Параметры скорости полета камеры
+	if (APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0))
+	{
+		if (ARailSpectatorPawn* Pawn = Cast<ARailSpectatorPawn>(PC->GetPawn()))
+		{
+			Pawn->SetFlightSpeeds(FlySpeed_cmps, BoostMultiplier);
+		}
+	}
+
+	// 2. Параметры ленты пути
+	if (PathRenderer)
+	{
+		PathRenderer->SetVisualParameters(PathWidth_cm, PathHeight_cm);
+	}
+
+	// 3. Масштаб станций и контрольных точек
+	const float BaseRadius = 8000.0f * EndpointScale;
+	if (StartEndpoint)
+	{
+		StartEndpoint->SetBaseSphereRadius(BaseRadius);
+		StartEndpoint->SetViewScale(StartEndpoint->GetViewScale(), true);
+	}
+	if (EndEndpoint)
+	{
+		EndEndpoint->SetBaseSphereRadius(BaseRadius);
+		EndEndpoint->SetViewScale(EndEndpoint->GetViewScale(), true);
+	}
+	for (ARailEndpoint* WP : Waypoints)
+	{
+		if (IsValid(WP))
+		{
+			WP->SetBaseSphereRadius(BaseRadius);
+			WP->SetViewScale(WP->GetViewScale(), true);
+		}
+	}
+
+	// Если трасса уже рассчитана, перестраиваем геометрию ленты с новыми габаритами
+	if (bIsProjectActive && bGridCached && StartEndpoint && EndEndpoint)
+	{
+		RecomputePath();
 	}
 }
 
@@ -160,11 +259,33 @@ void ARailOptimaGameMode::OpenProject(const FRailProjectMetadata& InProject)
 	bIsProjectActive = true;
 	CurrentActiveProject = InProject;
 
+	EnsureDefaultEnvironment();
+
+	if (!Terrain)
+	{
+		FindTerrain();
+	}
+	if (!PathRenderer)
+	{
+		SetupPathRenderer();
+	}
+	if (!StartEndpoint || !EndEndpoint)
+	{
+		SetupEndpoints();
+	}
+
+	if (URailCrashReporter* CrashReporter = URailCrashReporter::Get(this))
+	{
+		CrashReporter->SetActiveProjectContext(InProject.ProjectName, InProject.CategoryName);
+	}
+
 	// Установка категории
 	SelectedCategory = InProject.Category;
 	ApplySelectedCategory();
 
-	// Очищаем старую сетку и геометрию пути
+	// Очищаем старую сетку, контрольные точки, зоны и геометрию пути
+	ClearAllWaypoints();
+	ClearAllZones();
 	bGridCached = false;
 	CachedGrid = FRailGridData();
 	if (PathRenderer)
@@ -175,10 +296,36 @@ void ARailOptimaGameMode::OpenProject(const FRailProjectMetadata& InProject)
 	// Загружаем ландшафт
 	if (Terrain)
 	{
-		bool bLoaded = Terrain->LoadTerrainFromFiles(InProject.HeightmapPath, InProject.MetaPath);
+		bool bLoaded = false;
+		if (!InProject.HeightmapPath.IsEmpty() && FPaths::FileExists(InProject.HeightmapPath))
+		{
+			bLoaded = Terrain->LoadTerrainFromFiles(InProject.HeightmapPath, InProject.MetaPath);
+		}
+
+		if (!bLoaded)
+		{
+			// Пробуем альтернативные пути: внутри папки проекта или в RawContent
+			const FString Alt1 = InProject.ProjectPath / FPaths::GetCleanFilename(InProject.HeightmapPath);
+			const FString Alt2 = FPaths::ProjectDir() / TEXT("RawContent") / FPaths::GetCleanFilename(InProject.HeightmapPath);
+			if (FPaths::FileExists(Alt1))
+			{
+				bLoaded = Terrain->LoadTerrainFromFiles(Alt1, InProject.MetaPath);
+			}
+			else if (FPaths::FileExists(Alt2))
+			{
+				bLoaded = Terrain->LoadTerrainFromFiles(Alt2, InProject.MetaPath);
+			}
+		}
+
 		if (!bLoaded)
 		{
 			ShowToast(FString::Printf(TEXT("Внимание: карта высот не найдена: %s"), *InProject.HeightmapPath), ERailToastType::Warning);
+		}
+		else if (PathRenderer)
+		{
+			PathRenderer->WorldZScale = Terrain->TerrainParameters.ZScale;
+			const FVector Loc = Terrain->GetActorLocation();
+			PathRenderer->GridWorldOrigin = FVector(Loc.X, Loc.Y, 0.0f);
 		}
 	}
 
@@ -203,8 +350,20 @@ void ARailOptimaGameMode::OpenProject(const FRailProjectMetadata& InProject)
 		}
 	}
 
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
 	if (InProject.bHasRoads && !InProject.RoadsPath.IsEmpty() && FPaths::FileExists(InProject.RoadsPath))
 	{
+		if (!RoadActor)
+		{
+			RoadActor = GetWorld()->SpawnActor<ARoadRenderer>(ARoadRenderer::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+			if (RoadActor)
+			{
+				RoadActor->FeatureType = ERoadFeatureType::Road;
+				RoadActor->Terrain = Terrain;
+			}
+		}
 		if (RoadActor)
 		{
 			RoadActor->LoadAndBuild(InProject.RoadsPath);
@@ -213,6 +372,16 @@ void ARailOptimaGameMode::OpenProject(const FRailProjectMetadata& InProject)
 
 	if (InProject.bHasRivers && !InProject.RiversPath.IsEmpty() && FPaths::FileExists(InProject.RiversPath))
 	{
+		if (!RiverActor)
+		{
+			RiverActor = GetWorld()->SpawnActor<ARoadRenderer>(ARoadRenderer::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+			if (RiverActor)
+			{
+				RiverActor->FeatureType = ERoadFeatureType::River;
+				RiverActor->RiverColor = FLinearColor(0.05f, 0.45f, 0.95f, 0.95f);
+				RiverActor->Terrain = Terrain;
+			}
+		}
 		if (RiverActor)
 		{
 			RiverActor->LoadAndBuild(InProject.RiversPath);
@@ -329,6 +498,13 @@ void ARailOptimaGameMode::CloseCurrentProject()
 	{
 		EndEndpoint->SetActorHiddenInGame(true);
 	}
+	ClearAllWaypoints();
+	SetBrushModeActive(false);
+
+	if (ZoneOverlayRenderer)
+	{
+		ZoneOverlayRenderer->ClearZones();
+	}
 	if (PathRenderer)
 	{
 		PathRenderer->ClearPath();
@@ -343,6 +519,15 @@ void ARailOptimaGameMode::CloseCurrentProject()
 	}
 
 	SetupMainMenuWidget();
+
+	APlayerController* PC = UGameplayStatics::GetPlayerController(this, 0);
+	if (PC)
+	{
+		PC->bShowMouseCursor = true;
+		FInputModeGameAndUI InputMode;
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		PC->SetInputMode(InputMode);
+	}
 }
 
 void ARailOptimaGameMode::ExportCostToExcel()
@@ -488,6 +673,14 @@ void ARailOptimaGameMode::ApplyViewScaleFromCamera(ARailSpectatorPawn* InPawn)
 	if (EndEndpoint)
 		EndEndpoint->SetViewScale(CurrentViewScale);
 
+	for (ARailEndpoint* WP : Waypoints)
+	{
+		if (IsValid(WP))
+		{
+			WP->SetViewScale(CurrentViewScale);
+		}
+	}
+
 	if (PathRenderer)
 	{
 		PathRenderer->SetViewScale(CurrentViewScale);
@@ -553,12 +746,63 @@ void ARailOptimaGameMode::SetupSubsystems()
 	ApplySelectedCategory();
 }
 
+void ARailOptimaGameMode::EnsureDefaultEnvironment()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+		return;
+
+	// Проверяем наличие направленного света (Солнце)
+	TArray<AActor*> DirLights;
+	UGameplayStatics::GetAllActorsOfClass(World, ADirectionalLight::StaticClass(), DirLights);
+	if (DirLights.Num() == 0)
+	{
+		FActorSpawnParameters SP;
+		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ADirectionalLight* Sun = World->SpawnActor<ADirectionalLight>(ADirectionalLight::StaticClass(), FVector(0.0f, 0.0f, 50000.0f), FRotator(-50.0f, -45.0f, 0.0f), SP);
+		if (Sun)
+		{
+			if (UDirectionalLightComponent* DLC = Sun->GetComponentByClass<UDirectionalLightComponent>())
+			{
+				DLC->SetIntensity(10.0f);
+				DLC->SetAtmosphereSunLight(true);
+				DLC->SetLightColor(FLinearColor(1.0f, 0.98f, 0.92f));
+			}
+		}
+	}
+
+	// Проверяем наличие небесного света (SkyLight)
+	TArray<AActor*> SkyLights;
+	UGameplayStatics::GetAllActorsOfClass(World, ASkyLight::StaticClass(), SkyLights);
+	if (SkyLights.Num() == 0)
+	{
+		FActorSpawnParameters SP;
+		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ASkyLight* Sky = World->SpawnActor<ASkyLight>(ASkyLight::StaticClass(), FVector(0.0f, 0.0f, 60000.0f), FRotator::ZeroRotator, SP);
+		if (Sky && Sky->GetLightComponent())
+		{
+			Sky->GetLightComponent()->SetIntensity(2.0f);
+			Sky->GetLightComponent()->bRealTimeCapture = true;
+			Sky->GetLightComponent()->SetLightColor(FLinearColor(0.85f, 0.92f, 1.0f));
+		}
+	}
+}
+
 void ARailOptimaGameMode::FindTerrain()
 {
 	TArray<AActor*> Found;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AProceduralTerrain::StaticClass(), Found);
 	if (Found.Num() > 0)
+	{
 		Terrain = Cast<AProceduralTerrain>(Found[0]);
+	}
+	else if (!Terrain)
+	{
+		FActorSpawnParameters SP;
+		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		Terrain = GetWorld()->SpawnActor<AProceduralTerrain>(AProceduralTerrain::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SP);
+		UE_LOG(LogTemp, Log, TEXT("[RailGM] AProceduralTerrain автоматически создан в мире."));
+	}
 }
 
 void ARailOptimaGameMode::SetupPathRenderer()
@@ -566,7 +810,16 @@ void ARailOptimaGameMode::SetupPathRenderer()
 	TArray<AActor*> Found;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), APathRenderer::StaticClass(), Found);
 	if (Found.Num() > 0)
+	{
 		PathRenderer = Cast<APathRenderer>(Found[0]);
+	}
+	else if (!PathRenderer)
+	{
+		FActorSpawnParameters SP;
+		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		PathRenderer = GetWorld()->SpawnActor<APathRenderer>(APathRenderer::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SP);
+		UE_LOG(LogTemp, Log, TEXT("[RailGM] APathRenderer автоматически создан в мире."));
+	}
 
 	if (PathRenderer && Terrain)
 	{
@@ -634,12 +887,27 @@ void ARailOptimaGameMode::RecomputePath()
 	if (!bGridCached)
 		return;
 
-	const int32 StartIdx = WorldToNodeIndex(CachedGrid, StartEndpoint->GetActorLocation());
-	const int32 EndIdx = WorldToNodeIndex(CachedGrid, EndEndpoint->GetActorLocation());
+	// Собираем все контрольные точки маршрута: Start -> Waypoints[0..N] -> End
+	TArray<ARailEndpoint*> SegPoints;
+	if (StartEndpoint && !StartEndpoint->IsHidden())
+	{
+		SegPoints.Add(StartEndpoint);
+	}
+	for (ARailEndpoint* WP : Waypoints)
+	{
+		if (IsValid(WP) && !WP->IsHidden())
+		{
+			SegPoints.Add(WP);
+		}
+	}
+	if (EndEndpoint && !EndEndpoint->IsHidden())
+	{
+		SegPoints.Add(EndEndpoint);
+	}
 
 	const FRailCategoryNorms Norms = FRailCategoryNorms::GetNorms(SelectedCategory);
 
-	if (StartIdx == INDEX_NONE || EndIdx == INDEX_NONE || StartIdx == EndIdx)
+	if (SegPoints.Num() < 2)
 	{
 		LastLength_m = 0.0;
 		LastCost_kRub = 0.0;
@@ -648,6 +916,10 @@ void ARailOptimaGameMode::RecomputePath()
 		LastCalcTime_ms = 0.0;
 
 		PathRenderer->ClearPath();
+		if (ProfileWidget)
+		{
+			ProfileWidget->UpdateProfileData(TArray<FRailProfilePoint>(), 0.0f, 0.0f, 0.0f, 0.0f);
+		}
 		if (CostSummaryWidget)
 		{
 			CostSummaryWidget->UpdateRouteSummary(Norms.CategoryName, 0.0, 0.0, 0.0f, 0.0f, 0.0);
@@ -656,26 +928,71 @@ void ARailOptimaGameMode::RecomputePath()
 		return;
 	}
 
-	// 1. Сначала ищем путь в строгом соответствии с нормативом уклона (15‰)
+	// 1. Построение сквозного маршрута по всем промежуточным секциям
 	PathFinder->SetCategoryNorms(Norms);
 
-	const double	T0 = FPlatformTime::Seconds();
-	FRailPathResult Result = PathFinder->FindPath(CachedGrid, StartIdx, EndIdx);
+	const double T0 = FPlatformTime::Seconds();
+	FRailPathResult CompositeResult;
+	CompositeResult.bFound = true;
+	CompositeResult.TotalCost = 0.0f;
+	CompositeResult.TotalLength_m = 0.0f;
 
-	// 2. Если на крутом горном рельефе прямой путь <= 15‰ невозможен, делаем fallback
-	// с допуском горных/тоннельных участков (с высокими надбавками НЦС за мосты/тоннели)
-	if (!Result.bFound)
+	for (int32 s = 0; s < SegPoints.Num() - 1; ++s)
 	{
-		FRailCategoryNorms RelaxedNorms = Norms;
-		RelaxedNorms.MaxSlopePermille = 150.0f;
-		PathFinder->SetCategoryNorms(RelaxedNorms);
-		Result = PathFinder->FindPath(CachedGrid, StartIdx, EndIdx);
-		PathFinder->SetCategoryNorms(Norms);
+		const int32 SegStartIdx = WorldToNodeIndex(CachedGrid, SegPoints[s]->GetActorLocation());
+		const int32 SegEndIdx = WorldToNodeIndex(CachedGrid, SegPoints[s + 1]->GetActorLocation());
+
+		if (SegStartIdx == INDEX_NONE || SegEndIdx == INDEX_NONE)
+		{
+			CompositeResult.bFound = false;
+			break;
+		}
+
+		if (SegStartIdx == SegEndIdx)
+		{
+			continue;
+		}
+
+		FRailPathResult SegRes = PathFinder->FindPath(CachedGrid, SegStartIdx, SegEndIdx);
+
+		// Если по нормативу не сошлось — пробуем relaxed fallback (горный/тоннельный допуск)
+		if (!SegRes.bFound)
+		{
+			FRailCategoryNorms RelaxedNorms = Norms;
+			RelaxedNorms.MaxSlopePermille = 150.0f;
+			PathFinder->SetCategoryNorms(RelaxedNorms);
+			SegRes = PathFinder->FindPath(CachedGrid, SegStartIdx, SegEndIdx);
+			PathFinder->SetCategoryNorms(Norms);
+		}
+
+		if (!SegRes.bFound)
+		{
+			CompositeResult.bFound = false;
+			break;
+		}
+
+		if (CompositeResult.NodeIndices.Num() == 0)
+		{
+			CompositeResult.NodeIndices = SegRes.NodeIndices;
+		}
+		else
+		{
+			// Пропускаем нулевой элемент, так как он совпадает с концом предыдущего сегмента
+			for (int32 p = 1; p < SegRes.NodeIndices.Num(); ++p)
+			{
+				CompositeResult.NodeIndices.Add(SegRes.NodeIndices[p]);
+			}
+		}
+
+		CompositeResult.TotalCost += SegRes.TotalCost;
+		CompositeResult.TotalLength_m += SegRes.TotalLength_m;
+		CompositeResult.EdgeCosts.Append(SegRes.EdgeCosts);
 	}
 
 	const double Ms = (FPlatformTime::Seconds() - T0) * 1000.0;
+	FRailPathResult Result = MoveTemp(CompositeResult);
 
-	if (!Result.bFound)
+	if (!Result.bFound || Result.NodeIndices.Num() < 2)
 	{
 		LastLength_m = 0.0;
 		LastCost_kRub = 0.0;
@@ -684,6 +1001,10 @@ void ARailOptimaGameMode::RecomputePath()
 		LastCalcTime_ms = Ms;
 
 		PathRenderer->ClearPath();
+		if (ProfileWidget)
+		{
+			ProfileWidget->UpdateProfileData(TArray<FRailProfilePoint>(), 0.0f, 0.0f, 0.0f, 0.0f);
+		}
 		if (CostSummaryWidget)
 		{
 			CostSummaryWidget->UpdateRouteSummary(Norms.CategoryName, 0.0, 0.0, 0.0f, 0.0f, Ms);
@@ -696,6 +1017,7 @@ void ARailOptimaGameMode::RecomputePath()
 	float			MinPlanRadius_m = 0.0f;
 	float			MaxSlopePermille = 0.0f;
 	TArray<FVector> SmoothPoints = GenerateRailwayArcs(CachedGrid, Result, Norms, MinPlanRadius_m, MaxSlopePermille);
+	LastSmoothTrackPoints = SmoothPoints;
 
 	// 4. Валидация по СП 119.13330 (проверка построенной 3D трассы)
 	if (PathValidator && SmoothPoints.Num() > 1)
@@ -749,10 +1071,61 @@ void ARailOptimaGameMode::RecomputePath()
 		}
 
 		PathRenderer->RenderCustomPath(SmoothPoints, Colors);
+
+		// Обновляем данные проекции высот продольного профиля (F1)
+		if (SmoothPoints.Num() > 1)
+		{
+			LastProfilePoints.Reset();
+			LastProfilePoints.Reserve(SmoothPoints.Num());
+
+			const float ZOff_cm = PathRenderer ? PathRenderer->ZOffset_cm : 8000.0f;
+
+			float CumulativeDist_m = 0.0f;
+			float MinH = TNumericLimits<float>::Max();
+			float MaxH = TNumericLimits<float>::Lowest();
+
+			for (int32 i = 0; i < SmoothPoints.Num(); ++i)
+			{
+				if (i > 0)
+				{
+					CumulativeDist_m += FVector2D::Distance(
+						FVector2D(SmoothPoints[i - 1].X, SmoothPoints[i - 1].Y),
+						FVector2D(SmoothPoints[i].X, SmoothPoints[i].Y)) * 0.01f;
+				}
+
+				FRailProfilePoint Pt;
+				Pt.DistanceAlongRoute_m = CumulativeDist_m;
+				Pt.TrackHeight_m = (SmoothPoints[i].Z - ZOff_cm) * 0.01f / ZScale;
+
+				float TerrainZ_cm = 0.0f;
+				if (Terrain && Terrain->SampleTerrainZ_cm(FVector2D(SmoothPoints[i].X, SmoothPoints[i].Y), TerrainZ_cm))
+				{
+					Pt.TerrainHeight_m = TerrainZ_cm * 0.01f / ZScale;
+				}
+				else
+				{
+					Pt.TerrainHeight_m = Pt.TrackHeight_m;
+				}
+
+				MinH = FMath::Min(MinH, FMath::Min(Pt.TrackHeight_m, Pt.TerrainHeight_m));
+				MaxH = FMath::Max(MaxH, FMath::Max(Pt.TrackHeight_m, Pt.TerrainHeight_m));
+
+				LastProfilePoints.Add(Pt);
+			}
+
+			if (ProfileWidget)
+			{
+				ProfileWidget->UpdateProfileData(LastProfilePoints, MinH, MaxH, CumulativeDist_m, MaxSlopePermille);
+			}
+		}
 	}
 	else
 	{
 		PathRenderer->ClearPath();
+		if (ProfileWidget)
+		{
+			ProfileWidget->UpdateProfileData(TArray<FRailProfilePoint>(), 0.0f, 0.0f, 0.0f, 0.0f);
+		}
 	}
 
 	// 6. Обновляем UI-табличку со сметой НЦС 81-02-07-2025
@@ -808,7 +1181,8 @@ TArray<FVector> ARailOptimaGameMode::GenerateRailwayArcs(
 	}
 
 	// 2. Упрощение ломаной (алгоритм Рамера — Дугласа — Пекера)
-	const float		  RDP_Tolerance = 15000.0f; // 150 м
+	// Допуск подбирается пропорционально шагу сетки (30-50 м), чтобы не срезать плавные изгибы в острые углы
+	const float		  RDP_Tolerance = FMath::Clamp(InGrid.StepSize_m * 45.0f, 3000.0f, 5000.0f);
 	TArray<FVector2D> Simplified;
 	Simplified.Add(RawPoints[0]);
 
@@ -874,55 +1248,70 @@ TArray<FVector> ARailOptimaGameMode::GenerateRailwayArcs(
 			const float MaxFittingRadius_m = (MaxTangent_cm / HalfTurnTan) * 0.01f;
 
 			// Выбираем радиус из стандартного ряда СП 119.13330 (4000, 3000, 2500 ... 180 м)
-			const float SelectedStandardRadius_m = InNorms.PickStandardRadius(MaxFittingRadius_m);
-
-			if (SelectedStandardRadius_m > 0.0f && SelectedStandardRadius_m <= MaxFittingRadius_m)
+			float TargetRadius_m = InNorms.PickStandardRadius(MaxFittingRadius_m);
+			if (TargetRadius_m <= 0.0f || (TargetRadius_m * 100.0f * HalfTurnTan > MaxTangent_cm + 1.0f))
 			{
-				const float R_cm = SelectedStandardRadius_m * 100.0f;
-				const float T_cm = R_cm * HalfTurnTan;
+				TargetRadius_m = FMath::Max(MaxFittingRadius_m, 50.0f);
+			}
 
-				if (T_cm <= MaxTangent_cm + 1.0f)
+			const float R_cm = TargetRadius_m * 100.0f;
+			const float T_cm = FMath::Min(R_cm * HalfTurnTan, MaxTangent_cm);
+
+			if (T_cm > 100.0f && R_cm > 2000.0f)
+			{
+				BestMinRadius_m = FMath::Min(BestMinRadius_m, TargetRadius_m);
+
+				const FVector2D T1 = PCurr - V1 * T_cm;
+				const FVector2D T2 = PCurr + V2 * T_cm;
+
+				if (FVector2D::Distance(Final2D.Last(), T1) > 10.0f)
 				{
-					BestMinRadius_m = FMath::Min(BestMinRadius_m, SelectedStandardRadius_m);
-
-					if (SelectedStandardRadius_m < 300.0f)
-					{
-						UE_LOG(LogTemp, Warning,
-							TEXT("[ArcGen] Малый радиус R=%.0f м (< 300 м): по СП 119.13330 требуется ТЭО и ограничение скорости!"),
-							SelectedStandardRadius_m);
-					}
-
-					const FVector2D T1 = PCurr - V1 * T_cm;
-					const FVector2D T2 = PCurr + V2 * T_cm;
-
-					if (FVector2D::Distance(Final2D.Last(), T1) > 10.0f)
-					{
-						Final2D.Add(T1);
-					}
-
-					// Находим центр дуги через нормаль в сторону поворота
-					const float		CrossZ = V1.X * V2.Y - V1.Y * V2.X;
-					const float		Sign = (CrossZ >= 0.0f) ? 1.0f : -1.0f;
-					const FVector2D PerpV1(-V1.Y * Sign, V1.X * Sign);
-					const FVector2D Center = T1 + PerpV1 * R_cm;
-
-					const float StartAngle = FMath::Atan2(T1.Y - Center.Y, T1.X - Center.X);
-					const float EndAngle = FMath::Atan2(T2.Y - Center.Y, T2.X - Center.X);
-					float		DeltaAngle = EndAngle - StartAngle;
-
-					while (DeltaAngle > PI)
-						DeltaAngle -= 2.0f * PI;
-					while (DeltaAngle < -PI)
-						DeltaAngle += 2.0f * PI;
-
-					const int32 NumSteps = FMath::Clamp(FMath::CeilToInt(FMath::Abs(DeltaAngle) * R_cm / 2000.0f), 6, 48);
-					for (int32 s = 1; s <= NumSteps; ++s)
-					{
-						const float a = StartAngle + DeltaAngle * (static_cast<float>(s) / static_cast<float>(NumSteps));
-						Final2D.Add(Center + FVector2D(FMath::Cos(a), FMath::Sin(a)) * R_cm);
-					}
-					bArcAdded = true;
+					Final2D.Add(T1);
 				}
+
+				// Находим центр дуги через нормаль в сторону поворота
+				const float		CrossZ = V1.X * V2.Y - V1.Y * V2.X;
+				const float		Sign = (CrossZ >= 0.0f) ? 1.0f : -1.0f;
+				const FVector2D PerpV1(-V1.Y * Sign, V1.X * Sign);
+				const FVector2D Center = T1 + PerpV1 * R_cm;
+
+				const float StartAngle = FMath::Atan2(T1.Y - Center.Y, T1.X - Center.X);
+				const float EndAngle = FMath::Atan2(T2.Y - Center.Y, T2.X - Center.X);
+				float		DeltaAngle = EndAngle - StartAngle;
+
+				while (DeltaAngle > PI)
+					DeltaAngle -= 2.0f * PI;
+				while (DeltaAngle < -PI)
+					DeltaAngle += 2.0f * PI;
+
+				const int32 NumSteps = FMath::Clamp(FMath::CeilToInt(FMath::Abs(DeltaAngle) * R_cm / 2000.0f), 6, 48);
+				for (int32 s = 1; s <= NumSteps; ++s)
+				{
+					const float a = StartAngle + DeltaAngle * (static_cast<float>(s) / static_cast<float>(NumSteps));
+					Final2D.Add(Center + FVector2D(FMath::Cos(a), FMath::Sin(a)) * R_cm);
+				}
+				bArcAdded = true;
+			}
+			else if (MaxTangent_cm > 100.0f)
+			{
+				// Плавное квадратичное скругление Безье для предотвращения любых острых углов
+				const FVector2D T1 = PCurr - V1 * MaxTangent_cm;
+				const FVector2D T2 = PCurr + V2 * MaxTangent_cm;
+
+				if (FVector2D::Distance(Final2D.Last(), T1) > 10.0f)
+				{
+					Final2D.Add(T1);
+				}
+
+				const int32 NumBezSteps = 8;
+				for (int32 b = 1; b <= NumBezSteps; ++b)
+				{
+					const float t = static_cast<float>(b) / static_cast<float>(NumBezSteps);
+					const float omt = 1.0f - t;
+					const FVector2D BezPt = omt * omt * T1 + 2.0f * omt * t * PCurr + t * t * T2;
+					Final2D.Add(BezPt);
+				}
+				bArcAdded = true;
 			}
 		}
 
@@ -1137,4 +1526,291 @@ void ARailOptimaGameMode::ShowGraphicsSettings()
 void ARailOptimaGameMode::HandleGraphicsSettingsApplied()
 {
 	ShowToast(TEXT("Настройки графики успешно применены и сохранены"), ERailToastType::Success, 3.5f);
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  Промежуточные контрольные точки (Waypoints)
+// ─────────────────────────────────────────────────────────────────
+
+ARailEndpoint* ARailOptimaGameMode::AddWaypointAtLocation(const FVector& WorldLocation, int32 InsertIndex)
+{
+	FActorSpawnParameters SP;
+	SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	UClass* EndpointClass = StartEndpoint ? StartEndpoint->GetClass() : ARailEndpoint::StaticClass();
+	ARailEndpoint* WP = GetWorld()->SpawnActor<ARailEndpoint>(EndpointClass, WorldLocation, FRotator::ZeroRotator, SP);
+	if (!WP)
+	{
+		return nullptr;
+	}
+
+	WP->bIsStart = false;
+	WP->bIsWaypoint = true;
+	if (StartEndpoint)
+	{
+		WP->SetActorScale3D(StartEndpoint->GetActorScale3D());
+		WP->SetBaseSphereRadius(StartEndpoint->GetBaseSphereRadius());
+		WP->SphereRadius_cm = StartEndpoint->SphereRadius_cm;
+		WP->TerrainZOffset_cm = StartEndpoint->TerrainZOffset_cm;
+		WP->SetViewScale(StartEndpoint->GetViewScale(), /*bForce=*/true);
+	}
+	else
+	{
+		WP->SetViewScale(10.0f, /*bForce=*/true);
+	}
+	WP->SetActorLocation(WorldLocation);
+	WP->SetCustomColor(FLinearColor(1.0f, 0.72f, 0.05f, 1.0f)); // Янтарно-желтый
+	WP->OnEndpointMoved.AddDynamic(this, &ARailOptimaGameMode::HandleEndpointMoved);
+
+	if (InsertIndex >= 0 && InsertIndex <= Waypoints.Num())
+	{
+		Waypoints.Insert(WP, InsertIndex);
+	}
+	else
+	{
+		Waypoints.Add(WP);
+	}
+
+	ShowToast(FString::Printf(TEXT("Добавлена контрольная точка #%d (ПКМ на точку для удаления)"), Waypoints.Num()), ERailToastType::Success, 3.0f);
+	RecomputePath();
+	return WP;
+}
+
+bool ARailOptimaGameMode::TryAddWaypointNearLocation(const FVector& WorldLocation)
+{
+	if (LastSmoothTrackPoints.Num() < 2)
+	{
+		AddWaypointAtLocation(WorldLocation);
+		return true;
+	}
+
+	float MinDistSq = MAX_flt;
+	int32 BestSegmentIndex = 0;
+
+	for (int32 i = 0; i < LastSmoothTrackPoints.Num() - 1; ++i)
+	{
+		const FVector P1 = LastSmoothTrackPoints[i];
+		const FVector P2 = LastSmoothTrackPoints[i + 1];
+		const FVector ClosestPoint = FMath::ClosestPointOnSegment(WorldLocation, P1, P2);
+		const float DistSq = FVector::DistSquared(WorldLocation, ClosestPoint);
+		if (DistSq < MinDistSq)
+		{
+			MinDistSq = DistSq;
+			BestSegmentIndex = i;
+		}
+	}
+
+	// Порог клика: в пределах 250 метров от полотна
+	const float MaxThresholdSq = FMath::Square(25000.0f);
+	if (MinDistSq < MaxThresholdSq)
+	{
+		AddWaypointAtLocation(WorldLocation);
+		return true;
+	}
+
+	return false;
+}
+
+bool ARailOptimaGameMode::RemoveWaypoint(ARailEndpoint* InWaypoint)
+{
+	if (!InWaypoint || !Waypoints.Contains(InWaypoint))
+	{
+		return false;
+	}
+
+	InWaypoint->OnEndpointMoved.RemoveAll(this);
+	Waypoints.Remove(InWaypoint);
+	InWaypoint->Destroy();
+
+	ShowToast(TEXT("Контрольная точка удалена"), ERailToastType::Info, 2.5f);
+	RecomputePath();
+	return true;
+}
+
+void ARailOptimaGameMode::ClearAllWaypoints()
+{
+	for (ARailEndpoint* WP : Waypoints)
+	{
+		if (IsValid(WP))
+		{
+			WP->OnEndpointMoved.RemoveAll(this);
+			WP->Destroy();
+		}
+	}
+	Waypoints.Empty();
+}
+
+// ─────────────────────────────────────────────────────────────────
+//  Зоны и интерактивная кисть
+// ─────────────────────────────────────────────────────────────────
+
+void ARailOptimaGameMode::SetActiveZoneType(ERailZoneType NewType)
+{
+	ActiveZoneType = NewType;
+	if (BrushWidget)
+	{
+		BrushWidget->UpdateZoneTypeDisplay(ActiveZoneType);
+	}
+}
+
+void ARailOptimaGameMode::SetBrushRadius_m(float InRadius_m)
+{
+	BrushRadius_m = FMath::Clamp(InRadius_m, 25.0f, 1000.0f);
+	if (BrushWidget)
+	{
+		BrushWidget->UpdateRadiusDisplay(BrushRadius_m);
+	}
+}
+
+void ARailOptimaGameMode::SetBrushModeActive(bool bActive)
+{
+	bBrushModeActive = bActive;
+	if (bBrushModeActive)
+	{
+		if (!BrushWidget)
+		{
+			APlayerController* PC = GetWorld()->GetFirstPlayerController();
+			if (PC)
+			{
+				BrushWidget = CreateWidget<URailBrushWidget>(PC, URailBrushWidget::StaticClass());
+				if (BrushWidget)
+				{
+					BrushWidget->AddToViewport(15);
+				}
+			}
+		}
+
+		if (BrushWidget)
+		{
+			BrushWidget->SetVisibility(ESlateVisibility::Visible);
+			BrushWidget->UpdateRadiusDisplay(BrushRadius_m);
+			BrushWidget->UpdateZoneTypeDisplay(ActiveZoneType);
+		}
+
+		const TCHAR* ZoneName = (ActiveZoneType == ERailZoneType::ForbiddenRed)
+			? TEXT("Запретная зона (Красная)")
+			: TEXT("Ластик");
+		ShowToast(FString::Printf(TEXT("Режим кисти: %s. Рисуйте зажатием ЛКМ на карте (B для выхода)"), ZoneName), ERailToastType::Info, 3.5f);
+	}
+	else
+	{
+		if (BrushWidget)
+		{
+			BrushWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+		ShowToast(TEXT("Режим кисти отключен"), ERailToastType::Info, 2.0f);
+	}
+}
+
+void ARailOptimaGameMode::PaintZoneAtLocation(const FVector& WorldLocation)
+{
+	if (!bGridCached || CachedGrid.Width <= 0 || CachedGrid.Height <= 0)
+	{
+		return;
+	}
+
+	const FVector Origin = PathRenderer ? PathRenderer->GridWorldOrigin : FVector::ZeroVector;
+	const float Step_cm = CachedGrid.StepSize_m * 100.0f;
+	if (Step_cm <= 0.0f) return;
+
+	const float CenterGridX = (WorldLocation.X - Origin.X) / Step_cm;
+	const float CenterGridY = (WorldLocation.Y - Origin.Y) / Step_cm;
+	const float RadiusGrid = (BrushRadius_m * 100.0f) / Step_cm;
+	const float RadiusGridSq = RadiusGrid * RadiusGrid;
+
+	const int32 MinX = FMath::Clamp(FMath::FloorToInt(CenterGridX - RadiusGrid), 0, CachedGrid.Width - 1);
+	const int32 MaxX = FMath::Clamp(FMath::CeilToInt(CenterGridX + RadiusGrid), 0, CachedGrid.Width - 1);
+	const int32 MinY = FMath::Clamp(FMath::FloorToInt(CenterGridY - RadiusGrid), 0, CachedGrid.Height - 1);
+	const int32 MaxY = FMath::Clamp(FMath::CeilToInt(CenterGridY + RadiusGrid), 0, CachedGrid.Height - 1);
+
+	bool bModified = false;
+	for (int32 Y = MinY; Y <= MaxY; ++Y)
+	{
+		for (int32 X = MinX; X <= MaxX; ++X)
+		{
+			const float DistSq = FMath::Square(static_cast<float>(X) - CenterGridX) + FMath::Square(static_cast<float>(Y) - CenterGridY);
+			if (DistSq <= RadiusGridSq)
+			{
+				const int32 NodeIdx = CachedGrid.IndexOf(X, Y);
+				if (CachedGrid.Nodes.IsValidIndex(NodeIdx))
+				{
+					FRailGridNode& Node = CachedGrid.Nodes[NodeIdx];
+					if (ActiveZoneType == ERailZoneType::ForbiddenRed)
+					{
+						if (!Node.bIsForbidden)
+						{
+							Node.bIsForbidden = true;
+							Node.PriorityModifier = 1.0f;
+							bModified = true;
+						}
+					}
+					else // Eraser
+					{
+						if (Node.bIsForbidden)
+						{
+							Node.bIsForbidden = false;
+							Node.PriorityModifier = 1.0f;
+							bModified = true;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if (bModified)
+	{
+		UpdateZoneOverlay();
+	}
+}
+
+void ARailOptimaGameMode::SetupZoneOverlayRenderer()
+{
+	if (ZoneOverlayRenderer)
+		return;
+
+	TArray<AActor*> Found;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ARailZoneOverlayRenderer::StaticClass(), Found);
+	if (Found.Num() > 0)
+	{
+		ZoneOverlayRenderer = Cast<ARailZoneOverlayRenderer>(Found[0]);
+	}
+	else
+	{
+		FActorSpawnParameters SP;
+		SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		ZoneOverlayRenderer = GetWorld()->SpawnActor<ARailZoneOverlayRenderer>(
+			ARailZoneOverlayRenderer::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SP);
+	}
+}
+
+void ARailOptimaGameMode::ClearAllZones()
+{
+	if (!bGridCached) return;
+
+	for (FRailGridNode& Node : CachedGrid.Nodes)
+	{
+		Node.bIsForbidden = false;
+		Node.PriorityModifier = 1.0f;
+	}
+
+	if (ZoneOverlayRenderer)
+	{
+		ZoneOverlayRenderer->ClearZones();
+	}
+
+	UpdateZoneOverlay();
+	RecomputePath();
+	ShowToast(TEXT("Все запретные зоны очищены"), ERailToastType::Info, 2.5f);
+}
+
+void ARailOptimaGameMode::UpdateZoneOverlay()
+{
+	SetupZoneOverlayRenderer();
+	if (!ZoneOverlayRenderer || !bGridCached || CachedGrid.Width <= 0 || CachedGrid.Height <= 0)
+	{
+		return;
+	}
+
+	const FVector Origin = PathRenderer ? PathRenderer->GridWorldOrigin : FVector::ZeroVector;
+	ZoneOverlayRenderer->UpdateZones(CachedGrid, Origin, Terrain);
 }

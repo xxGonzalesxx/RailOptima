@@ -68,6 +68,11 @@ private:
 	void HandlePrimaryPressed();
 	void HandlePrimaryReleased();
 	void HandleEscapePressed();
+	void HandleProfileToggle();
+	void HandleSecondaryPressed();
+	void HandleBrushModeToggle();
+	void HandleBrushRadiusDecrease();
+	void HandleBrushRadiusIncrease();
 
 	// ─────────────────────────────────────────────────────────────────
 	//  Трассы
@@ -92,4 +97,8 @@ private:
 	TObjectPtr<ARailSpectatorPawn> SubscribedPawn;
 
 	int32 TraceFrameCounter = 0;
+
+	double LastLmbClickTime = 0.0;
+	FVector2D LastLmbClickPos = FVector2D::ZeroVector;
+	bool bIsPaintingBrush = false;
 };

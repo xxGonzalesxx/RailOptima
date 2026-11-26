@@ -47,29 +47,54 @@ bool UMapLoader::DecodeImage(const TArray<uint8>& InRawBytes, FRailHeightMapData
 		return false;
 	}
 
-	// Запрашиваем 16-битные данные (ERGBFormat::Gray, EBitDepth::UInt16)
+	// Пробуем распаковать 16-битные данные, а если изображение 8-битное или цветное — используем fallback
 	TArray<uint8> UncompressedBytes;
-	if (!ImageWrapper->GetRaw(ERGBFormat::Gray, 16, UncompressedBytes))
+	if (ImageWrapper->GetRaw(ERGBFormat::Gray, 16, UncompressedBytes))
 	{
-		UE_LOG(LogTemp, Error, TEXT("[UMapLoader] Не удалось распаковать изображение в 16-бит Grayscale."));
-		return false;
+		OutData.Width = ImageWrapper->GetWidth();
+		OutData.Height = ImageWrapper->GetHeight();
+		const int32 TotalPixels = OutData.Width * OutData.Height;
+		const uint16* PixelPtr = reinterpret_cast<const uint16*>(UncompressedBytes.GetData());
+
+		OutData.Heights.SetNumUninitialized(TotalPixels);
+		for (int32 i = 0; i < TotalPixels; ++i)
+		{
+			OutData.Heights[i] = static_cast<float>(PixelPtr[i]) / 65535.0f;
+		}
 	}
-
-	OutData.Width = ImageWrapper->GetWidth();
-	OutData.Height = ImageWrapper->GetHeight();
-
-	const int32	  TotalPixels = OutData.Width * OutData.Height;
-	const uint16* PixelPtr = reinterpret_cast<const uint16*>(UncompressedBytes.GetData());
-
-	OutData.Heights.SetNumUninitialized(TotalPixels);
-
-	// Заполняем нормализованный массив высот [0..1]
-	// Исходный 16-битный PNG от gdal_translate уже отмасштабирован в диапазон 0..65535
-	// пропорционально [MinElevation_m..MaxElevation_m]. Прямая нормализация сохраняет
-	// абсолютную привязку высот без локальных искажений.
-	for (int32 i = 0; i < TotalPixels; ++i)
+	else if (ImageWrapper->GetRaw(ERGBFormat::Gray, 8, UncompressedBytes))
 	{
-		OutData.Heights[i] = static_cast<float>(PixelPtr[i]) / 65535.0f;
+		OutData.Width = ImageWrapper->GetWidth();
+		OutData.Height = ImageWrapper->GetHeight();
+		const int32 TotalPixels = OutData.Width * OutData.Height;
+
+		OutData.Heights.SetNumUninitialized(TotalPixels);
+		for (int32 i = 0; i < TotalPixels; ++i)
+		{
+			OutData.Heights[i] = static_cast<float>(UncompressedBytes[i]) / 255.0f;
+		}
+	}
+	else if (ImageWrapper->GetRaw(ERGBFormat::BGRA, 8, UncompressedBytes))
+	{
+		OutData.Width = ImageWrapper->GetWidth();
+		OutData.Height = ImageWrapper->GetHeight();
+		const int32 TotalPixels = OutData.Width * OutData.Height;
+
+		OutData.Heights.SetNumUninitialized(TotalPixels);
+		for (int32 i = 0; i < TotalPixels; ++i)
+		{
+			const int32 BaseIdx = i * 4;
+			const uint8 B = UncompressedBytes[BaseIdx];
+			const uint8 G = UncompressedBytes[BaseIdx + 1];
+			const uint8 R = UncompressedBytes[BaseIdx + 2];
+			const float Luma = (0.299f * R + 0.587f * G + 0.114f * B) / 255.0f;
+			OutData.Heights[i] = Luma;
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[UMapLoader] Не удалось распаковать изображение карты высот (неподдерживаемый формат пикселей)."));
+		return false;
 	}
 
 	// Примерные метаданные высот в метрах (можно переопределить позже привязкой)

@@ -412,20 +412,29 @@ float UAStarPathFinder::EvaluateEdge(
 		}
 	}
 
-	// Жесткий запрет: поезда не могут разворачиваться назад или делать острый излом (>90 градусов).
-	// Углы до 45 градусов — штатные для дискретной 8-связной сетки.
-	// Углы от 46 до 90 градусов допускаются с прогрессивным штрафом в CostCalculator,
-	// после чего трасса сглаживается дугами нормативных радиусов по СП 119.13330.
-	if (TurnAngleDeg > 91.0f)
+	// Жесткий запрет: поезда не могут делать резкие изломы и развороты назад.
+	// На 8-связной сетке допустимы шаг вперед (0°) и плавный поворот на 45° на соседнюю диагональ/ортогональ.
+	// Изломы >= 90° (прямые, тупые и острые углы) категорически запрещены за один шаг сетки,
+	// так как они приводят к недопустимым радиусам кривизны (< 50 м). Поворот на 90° должен выполняться
+	// плавно минимум за 2 последовательных шага сетки (0° -> 45° -> 90°), обеспечивая R >= 300 м по СП 119.13330.
+	if (TurnAngleDeg > 50.0f)
 	{
-		return -1.0f; // Разворот назад или острый излом невозможен
+		return -1.0f; // Острый или прямой излом за один шаг запрещен
 	}
 
 	const float GroundCoef = CostCalculator->GetGroundCoefficient(ToNode.GroundType);
 	const float SlopePercent = SlopeRatio * 100.0f;
 
-	return CostCalculator->CalculateEdgeCost(
+	float EdgeCost = CostCalculator->CalculateEdgeCost(
 		EdgeLength_m, SlopePercent, TurnAngleDeg, GroundCoef);
+
+	// Учет зон приоритета: зеленая зона снижает стоимость прохождения, направляя трассу в рекомендуемый коридор
+	if (ToNode.PriorityModifier > 0.0f && !FMath::IsNearlyEqual(ToNode.PriorityModifier, 1.0f))
+	{
+		EdgeCost *= FMath::Max(ToNode.PriorityModifier, 0.05f);
+	}
+
+	return EdgeCost;
 }
 
 float UAStarPathFinder::Heuristic(

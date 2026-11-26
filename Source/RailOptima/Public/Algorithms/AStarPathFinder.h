@@ -30,6 +30,10 @@ struct FRailGridNode
 
 	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Grid")
 	bool bIsForbidden = false;
+
+	// Коэффициент приоритета зоны: 1.0 = нейтрально, < 1.0 = приоритетная (зеленая), > 1.0 = штрафная
+	UPROPERTY(BlueprintReadOnly, Category = "RailOptima|Grid")
+	float PriorityModifier = 1.0f;
 };
 
 USTRUCT(BlueprintType)

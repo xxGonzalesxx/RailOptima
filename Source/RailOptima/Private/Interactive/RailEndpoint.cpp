@@ -75,17 +75,19 @@ void ARailEndpoint::BeginPlay()
 {
 	Super::BeginPlay();
 
-	BaseSphereRadius_cm = SphereRadius_cm;
+	if (BaseSphereRadius_cm <= 0.0f)
+	{
+		BaseSphereRadius_cm = SphereRadius_cm;
+	}
+
+	SphereRadius_cm = BaseSphereRadius_cm * ViewScale;
 
 	ApplyVisuals();
 	LogState(TEXT("BeginPlay"));
 
-	// УДАЛЕН отладочный сброс в (10, 10, 0), теперь маркеры остаются на своих
-	// местах.
-
 	UE_LOG(LogTemp, Log,
 		TEXT("[RailEndpoint|%s] База радиуса зафиксирована: %.0f см."),
-		bIsStart ? TEXT("Start") : TEXT("End"), BaseSphereRadius_cm);
+		bIsStart ? TEXT("Start") : (bIsWaypoint ? TEXT("Waypoint") : TEXT("End")), BaseSphereRadius_cm);
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -137,11 +139,20 @@ void ARailEndpoint::SetHighlighted(bool bHighlighted)
 	DynamicMaterial->SetScalarParameterValue(TEXT("EmissiveBoost"), Emissive);
 }
 
-void ARailEndpoint::SetViewScale(float InScale)
+void ARailEndpoint::SetCustomColor(const FLinearColor& NewColor)
+{
+	EndpointColor = NewColor;
+	if (DynamicMaterial)
+	{
+		DynamicMaterial->SetVectorParameterValue(TEXT("BaseColor"), EndpointColor);
+	}
+}
+
+void ARailEndpoint::SetViewScale(float InScale, bool bForce)
 {
 	const float NewScale = FMath::Clamp(InScale, MinViewScale, MaxViewScale);
 
-	if (FMath::IsNearlyEqual(NewScale, ViewScale, 0.01f))
+	if (!bForce && FMath::IsNearlyEqual(NewScale, ViewScale, 0.01f))
 	{
 		return;
 	}

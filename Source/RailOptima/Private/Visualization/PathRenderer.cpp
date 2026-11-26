@@ -24,7 +24,7 @@ APathRenderer::APathRenderer()
 	PathMesh->SetupAttachment(SceneRoot);
 	PathMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	PathMesh->SetCastShadow(false);
-	PathMesh->bUseAsyncCooking = true;
+	PathMesh->bUseAsyncCooking = false;
 }
 
 void APathRenderer::BeginPlay()
@@ -135,7 +135,17 @@ void APathRenderer::ClearPath()
 	CachedRibbonPoints.Reset();
 	CachedRibbonColors.Reset();
 	if (PathMesh)
+	{
 		PathMesh->ClearAllMeshSections();
+		PathMesh->MarkRenderStateDirty();
+	}
+}
+
+void APathRenderer::SetVisualParameters(float InWidth_cm, float InZOffset_cm)
+{
+	BaseWidth_cm = InWidth_cm;
+	Width_cm = InWidth_cm * ViewScale;
+	ZOffset_cm = InZOffset_cm;
 }
 
 void APathRenderer::SetViewScale(float InScale)
@@ -325,6 +335,21 @@ void APathRenderer::BuildRibbon(const TArray<FVector>& InPoints, const TArray<FL
 
 	PathMesh->ClearAllMeshSections();
 	PathMesh->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UVs, VertColors, Tangents, false, true);
+	PathMesh->MarkRenderStateDirty();
 	if (PathMaterial)
+	{
 		PathMesh->SetMaterial(0, PathMaterial);
+	}
+	else
+	{
+		UMaterialInterface* FallbackMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/EngineDebugMaterials/VertexColorMaterial.VertexColorMaterial"));
+		if (!FallbackMat)
+		{
+			FallbackMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+		}
+		if (FallbackMat)
+		{
+			PathMesh->SetMaterial(0, FallbackMat);
+		}
+	}
 }

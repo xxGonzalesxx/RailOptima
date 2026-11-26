@@ -75,6 +75,14 @@ void ARailSpectatorPawn::Tick(float DeltaSeconds)
 	HandleMovement(DeltaSeconds);
 }
 
+void ARailSpectatorPawn::SetFlightSpeeds(float InFlySpeed_cmps, float InBoostMultiplier)
+{
+	FreeFlySpeed_cmps = FMath::Clamp(InFlySpeed_cmps, 10000.0f, 2000000.0f);
+	TopDownPanSpeed_cmps = FreeFlySpeed_cmps * 2.0f;
+	VerticalSpeed_cmps = FreeFlySpeed_cmps;
+	BoostMultiplier = FMath::Clamp(InBoostMultiplier, 1.0f, 20.0f);
+}
+
 void ARailSpectatorPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	Super::SetupPlayerInputComponent(PlayerInputComponent);

@@ -54,6 +54,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Camera")
 	bool CenterOnWorld(float InMapSizeX_cm, float InMapSizeY_cm, float InMapSizeZ_cm);
 
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Camera")
+	void SetFlightSpeeds(float InFlySpeed_cmps, float InBoostMultiplier);
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Camera")
+	float GetFreeFlySpeed() const { return FreeFlySpeed_cmps; }
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Camera")
+	float GetBoostMultiplier() const { return BoostMultiplier; }
+
 	FRailPrimaryActionSignature OnPrimaryPressed;
 	FRailPrimaryActionSignature OnPrimaryReleased;
 

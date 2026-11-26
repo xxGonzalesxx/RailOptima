@@ -49,6 +49,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Path")
 	void SetViewScale(float InScale);
 
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Path")
+	void SetVisualParameters(float InWidth_cm, float InZOffset_cm);
+
 	UFUNCTION(BlueprintPure, Category = "RailOptima|Path")
 	float GetViewScale() const { return ViewScale; }
 

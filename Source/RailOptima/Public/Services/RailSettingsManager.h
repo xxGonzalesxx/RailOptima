@@ -77,4 +77,35 @@ public:
 	// Сохранить текущие настройки в GameUserSettings.ini
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|Settings")
 	static void SaveSettings();
+
+	// ─── Настройки камеры и отображения пути ───
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Settings")
+	static void SetCameraFlySpeed(float Value);
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Settings")
+	static float GetCameraFlySpeed();
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Settings")
+	static void SetCameraShiftBoost(float Value);
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Settings")
+	static float GetCameraShiftBoost();
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Settings")
+	static void SetPathRibbonWidth(float Value);
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Settings")
+	static float GetPathRibbonWidth();
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Settings")
+	static void SetPathRibbonHeight(float Value);
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Settings")
+	static float GetPathRibbonHeight();
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Settings")
+	static void SetEndpointScaleMultiplier(float Value);
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Settings")
+	static float GetEndpointScaleMultiplier();
 };

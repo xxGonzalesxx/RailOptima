@@ -23,6 +23,19 @@ class URailCostSummaryWidget;
 class URailMainMenuWidget;
 class URailPauseMenuWidget;
 class URailGraphicsSettingsWidget;
+class URailBrushWidget;
+class ARailZoneOverlayRenderer;
+class URailProfileWidget;
+struct FRailProfilePoint;
+class UProceduralMeshComponent;
+
+UENUM(BlueprintType)
+enum class ERailZoneType : uint8
+{
+	ForbiddenRed   UMETA(DisplayName = "Запретная зона (Красная)"),
+	PriorityGreen  UMETA(DisplayName = "Приоритетная зона (Зеленая)"),
+	Eraser         UMETA(DisplayName = "Ластик")
+};
 
 DECLARE_MULTICAST_DELEGATE_FourParams(FRailPathRecomputedSignature,
 	double /*Length_m*/, double /*Cost_kRub*/, double /*TimeMs*/, int32 /*Nodes*/);
@@ -90,6 +103,54 @@ public:
 	ERailRoadCategory GetSelectedCategory() const { return SelectedCategory; }
 
 	// ─────────────────────────────────────────────────────────────────
+	//  Промежуточные точки (Waypoints)
+	// ─────────────────────────────────────────────────────────────────
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Waypoints")
+	ARailEndpoint* AddWaypointAtLocation(const FVector& WorldLocation, int32 InsertIndex = -1);
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Waypoints")
+	bool TryAddWaypointNearLocation(const FVector& WorldLocation);
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Waypoints")
+	bool RemoveWaypoint(ARailEndpoint* InWaypoint);
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Waypoints")
+	void ClearAllWaypoints();
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Waypoints")
+	const TArray<ARailEndpoint*>& GetWaypoints() const { return Waypoints; }
+
+	// ─────────────────────────────────────────────────────────────────
+	//  Зоны и интерактивная кисть
+	// ─────────────────────────────────────────────────────────────────
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Zones")
+	void SetBrushModeActive(bool bActive);
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Zones")
+	bool IsBrushModeActive() const { return bBrushModeActive; }
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Zones")
+	void ToggleBrushMode() { SetBrushModeActive(!bBrushModeActive); }
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Zones")
+	void SetActiveZoneType(ERailZoneType NewType);
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Zones")
+	ERailZoneType GetActiveZoneType() const { return ActiveZoneType; }
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Zones")
+	void SetBrushRadius_m(float InRadius_m);
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Zones")
+	float GetBrushRadius_m() const { return BrushRadius_m; }
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Zones")
+	void PaintZoneAtLocation(const FVector& WorldLocation);
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Zones")
+	void ClearAllZones();
+
+	// ─────────────────────────────────────────────────────────────────
 	//  Управление проектами и UI
 	// ─────────────────────────────────────────────────────────────────
 
@@ -113,6 +174,14 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "RailOptima|UI")
 	void ShowToast(const FString& Message, ERailToastType Type = ERailToastType::Info, float DurationSec = 4.5f);
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|UI")
+	void ToggleProfileWidget();
+
+	UFUNCTION(BlueprintCallable, Category = "RailOptima|Settings")
+	void ApplyVisualAndCameraSettings(float FlySpeed_cmps, float BoostMultiplier, float PathWidth_cm, float PathHeight_cm, float EndpointScale);
+
+	void LoadAndApplyVisualSettingsFromConfig();
 
 	UFUNCTION(BlueprintPure, Category = "RailOptima|Project")
 	bool IsProjectActive() const { return bIsProjectActive; }
@@ -148,6 +217,7 @@ protected:
 private:
 	void SetupSubsystems();
 	void SetupCostSummaryWidget();
+	void EnsureDefaultEnvironment();
 	void FindTerrain();
 	void SetupPathRenderer();
 	void SetupEndpoints();
@@ -240,6 +310,31 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<ARailEndpoint> EndEndpoint;
+
+	UPROPERTY()
+	TArray<TObjectPtr<ARailEndpoint>> Waypoints;
+
+	bool bBrushModeActive = false;
+	ERailZoneType ActiveZoneType = ERailZoneType::ForbiddenRed;
+	float BrushRadius_m = 150.0f;
+
+	TArray<FVector> LastSmoothTrackPoints;
+
+	void SetupZoneOverlayRenderer();
+	void UpdateZoneOverlay();
+
+	UPROPERTY()
+	TObjectPtr<ARailZoneOverlayRenderer> ZoneOverlayRenderer;
+
+	UPROPERTY()
+	TObjectPtr<URailBrushWidget> BrushWidget;
+
+	void SetupProfileWidget();
+
+	UPROPERTY()
+	TObjectPtr<URailProfileWidget> ProfileWidget;
+
+	TArray<FRailProfilePoint> LastProfilePoints;
 
 	FRailGridData CachedGrid;
 	bool		  bGridCached = false;

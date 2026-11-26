@@ -37,6 +37,31 @@ namespace
 		Style.Pressed.TintColor = FSlateColor(PressedColor);
 		return Style;
 	}
+
+	void ApplyDarkInputBoxStyle(UEditableTextBox* Box, const FString& PlaceholderText)
+	{
+		if (!Box) return;
+
+		FEditableTextBoxStyle Style = Box->GetWidgetStyle();
+		const FLinearColor BgNormal(0.04f, 0.075f, 0.13f, 0.95f);
+		const FLinearColor BgHovered(0.065f, 0.12f, 0.20f, 1.0f);
+		const FLinearColor BgFocused(0.08f, 0.15f, 0.26f, 1.0f);
+
+		Style.BackgroundImageNormal.TintColor = FSlateColor(BgNormal);
+		Style.BackgroundImageHovered.TintColor = FSlateColor(BgHovered);
+		Style.BackgroundImageFocused.TintColor = FSlateColor(BgFocused);
+		Style.BackgroundColor = FSlateColor(BgNormal);
+
+		Style.ForegroundColor = FSlateColor(FLinearColor(0.95f, 0.97f, 1.0f, 1.0f));
+		Style.FocusedForegroundColor = FSlateColor(FLinearColor(1.0f, 1.0f, 1.0f, 1.0f));
+		Style.TextStyle.ColorAndOpacity = FSlateColor(FLinearColor(0.95f, 0.97f, 1.0f, 1.0f));
+		Style.TextStyle.Font = FCoreStyle::GetDefaultFontStyle("Regular", 11);
+		Style.Padding = FMargin(12.0f, 8.0f);
+
+		Box->SetWidgetStyle(Style);
+		Box->SetHintText(FText::FromString(PlaceholderText));
+		Box->SetText(FText::GetEmpty());
+	}
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -981,7 +1006,7 @@ void URailMainMenuWidget::BuildCreateProjectModal(UCanvasPanel* RootCanvas)
 	VBox->AddChildToVerticalBox(NameLabel);
 
 	ProjectNameInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
-	ProjectNameInput->SetText(FText::FromString(TEXT("Участок трассы 1")));
+	ApplyDarkInputBoxStyle(ProjectNameInput, TEXT("Участок трассы 1"));
 	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(ProjectNameInput))
 	{
 		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 12.0f));
@@ -995,6 +1020,20 @@ void URailMainMenuWidget::BuildCreateProjectModal(UCanvasPanel* RootCanvas)
 	VBox->AddChildToVerticalBox(CatLabel);
 
 	CategoryComboBox = WidgetTree->ConstructWidget<UComboBoxString>(UComboBoxString::StaticClass());
+	{
+		FComboBoxStyle WidgetStyle = CategoryComboBox->GetWidgetStyle();
+		WidgetStyle.ComboButtonStyle.ButtonStyle.Normal.TintColor = FSlateColor(FLinearColor(0.04f, 0.08f, 0.15f, 0.95f));
+		WidgetStyle.ComboButtonStyle.ButtonStyle.Hovered.TintColor = FSlateColor(FLinearColor(0.07f, 0.14f, 0.25f, 1.0f));
+		WidgetStyle.ComboButtonStyle.ButtonStyle.Pressed.TintColor = FSlateColor(FLinearColor(0.02f, 0.05f, 0.10f, 1.0f));
+		WidgetStyle.ComboButtonStyle.MenuBorderBrush.TintColor = FSlateColor(FLinearColor(0.02f, 0.04f, 0.08f, 0.98f));
+		WidgetStyle.ComboButtonStyle.DownArrowImage.TintColor = FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f));
+		CategoryComboBox->SetWidgetStyle(WidgetStyle);
+
+		FTableRowStyle ItemStyle = CategoryComboBox->GetItemStyle();
+		ItemStyle.TextColor = FSlateColor(FLinearColor(0.95f, 0.95f, 0.98f, 1.0f));
+		ItemStyle.SelectedTextColor = FSlateColor(FLinearColor(0.35f, 0.78f, 1.0f, 1.0f));
+		CategoryComboBox->SetItemStyle(ItemStyle);
+	}
 	CategoryComboBox->AddOption(TEXT("Скоростная (до 250 км/ч)"));
 	CategoryComboBox->AddOption(TEXT("Особогрузонапряженная"));
 	CategoryComboBox->AddOption(TEXT("I Категория (Магистральная)"));
@@ -1062,7 +1101,7 @@ void URailMainMenuWidget::BuildCreateProjectModal(UCanvasPanel* RootCanvas)
 	}
 
 	FilePathInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
-	FilePathInput->SetHintText(FText::FromString(TEXT("Выберите файл карты высот...")));
+	ApplyDarkInputBoxStyle(FilePathInput, TEXT("Выберите файл карты высот..."));
 	if (UHorizontalBoxSlot* HSlot = FileHBox->AddChildToHorizontalBox(FilePathInput))
 	{
 		HSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
@@ -1188,7 +1227,7 @@ void URailMainMenuWidget::BuildCreateCloudProjectModal(UCanvasPanel* RootCanvas)
 	VBox->AddChildToVerticalBox(NameLabel);
 
 	CloudProjNameInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
-	CloudProjNameInput->SetText(FText::FromString(TEXT("Северный железнодорожный коридор")));
+	ApplyDarkInputBoxStyle(CloudProjNameInput, TEXT("Северный железнодорожный коридор"));
 	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(CloudProjNameInput))
 	{
 		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 12.0f));
@@ -1201,7 +1240,7 @@ void URailMainMenuWidget::BuildCreateCloudProjectModal(UCanvasPanel* RootCanvas)
 	VBox->AddChildToVerticalBox(DescLabel);
 
 	CloudProjDescInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
-	CloudProjDescInput->SetText(FText::FromString(TEXT("Предварительное технико-экономическое обоснование трассы")));
+	ApplyDarkInputBoxStyle(CloudProjDescInput, TEXT("Предварительное технико-экономическое обоснование трассы"));
 	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(CloudProjDescInput))
 	{
 		SubSlot->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 18.0f));
@@ -1330,7 +1369,11 @@ void URailMainMenuWidget::BuildAuthModal(UCanvasPanel* RootCanvas)
 	VBox->AddChildToVerticalBox(EmailLabel);
 
 	AuthEmailInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
-	AuthEmailInput->SetText(FText::FromString(Api && Api->IsAuthenticated() ? Api->GetAuthData().Email : TEXT("user@example.com")));
+	ApplyDarkInputBoxStyle(AuthEmailInput, TEXT("user@example.com"));
+	if (Api && Api->IsAuthenticated())
+	{
+		AuthEmailInput->SetText(FText::FromString(Api->GetAuthData().Email));
+	}
 	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(AuthEmailInput))
 	{
 		SubSlot->SetPadding(FMargin(0.0f, 3.0f, 0.0f, 10.0f));
@@ -1344,8 +1387,8 @@ void URailMainMenuWidget::BuildAuthModal(UCanvasPanel* RootCanvas)
 	VBox->AddChildToVerticalBox(PassLabel);
 
 	AuthPassInput = WidgetTree->ConstructWidget<UEditableTextBox>(UEditableTextBox::StaticClass());
+	ApplyDarkInputBoxStyle(AuthPassInput, TEXT("••••••••••••"));
 	AuthPassInput->SetIsPassword(true);
-	AuthPassInput->SetText(FText::FromString(TEXT("secure-password")));
 	if (UVerticalBoxSlot* SubSlot = VBox->AddChildToVerticalBox(AuthPassInput))
 	{
 		SubSlot->SetPadding(FMargin(0.0f, 3.0f, 0.0f, 12.0f));
@@ -1610,13 +1653,15 @@ void URailMainMenuWidget::HandleCreateCloudConfirmClicked()
 	if (!CloudProjNameInput)
 		return;
 
-	const FString Name = CloudProjNameInput->GetText().ToString().TrimStartAndEnd();
-	const FString Desc = CloudProjDescInput ? CloudProjDescInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
-
+	FString Name = CloudProjNameInput ? CloudProjNameInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
 	if (Name.IsEmpty())
 	{
-		ShowToast(TEXT("Название проекта не может быть пустым"), ERailToastType::Error);
-		return;
+		Name = TEXT("Северный железнодорожный коридор");
+	}
+	FString Desc = CloudProjDescInput ? CloudProjDescInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
+	if (Desc.IsEmpty())
+	{
+		Desc = TEXT("Предварительное технико-экономическое обоснование трассы");
 	}
 
 	if (URailApiService* Api = URailApiService::Get(this))
@@ -1678,14 +1723,12 @@ void URailMainMenuWidget::HandleBrowseFileClicked()
 
 void URailMainMenuWidget::HandleCreateProjectConfirmClicked()
 {
-	const FString ProjName = ProjectNameInput ? ProjectNameInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
-	const FString SrcPath = FilePathInput ? FilePathInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
-
+	FString ProjName = ProjectNameInput ? ProjectNameInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
 	if (ProjName.IsEmpty())
 	{
-		ShowToast(TEXT("Укажите название проекта!"), ERailToastType::Error);
-		return;
+		ProjName = TEXT("Участок трассы 1");
 	}
+	const FString SrcPath = FilePathInput ? FilePathInput->GetText().ToString().TrimStartAndEnd() : TEXT("");
 	if (SrcPath.IsEmpty() || !FPaths::FileExists(SrcPath))
 	{
 		ShowToast(TEXT("Указанный файл рельефа не найден!"), ERailToastType::Error);
@@ -1887,9 +1930,9 @@ void URailMainMenuWidget::HandleApiProjectDeleted(bool bSuccess, const FString& 
 
 UWidget* URailMainMenuWidget::HandleGenerateCategoryWidget(FString Item)
 {
-	UTextBlock* ItemText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+	UTextBlock* ItemText = WidgetTree ? WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass()) : NewObject<UTextBlock>(this);
 	ItemText->SetText(FText::FromString(Item));
-	ItemText->SetFont(FCoreStyle::GetDefaultFontStyle("Medium", 11));
-	ItemText->SetColorAndOpacity(FSlateColor(FLinearColor(0.92f, 0.95f, 0.98f, 1.0f)));
+	ItemText->SetFont(FCoreStyle::GetDefaultFontStyle("Bold", 11));
+	ItemText->SetColorAndOpacity(FSlateColor(FLinearColor(0.95f, 0.96f, 0.99f, 1.0f)));
 	return ItemText;
 }
