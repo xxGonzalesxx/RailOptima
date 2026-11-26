@@ -358,14 +358,13 @@ void ARailOptimaGameMode::OpenProject(const FRailProjectMetadata& InProject)
 		if (!RoadActor)
 		{
 			RoadActor = GetWorld()->SpawnActor<ARoadRenderer>(ARoadRenderer::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
-			if (RoadActor)
-			{
-				RoadActor->FeatureType = ERoadFeatureType::Road;
-				RoadActor->Terrain = Terrain;
-			}
 		}
 		if (RoadActor)
 		{
+			RoadActor->FeatureType = ERoadFeatureType::Road;
+			RoadActor->Width_cm = 3000.0f; // 30 м заметная лента автодороги
+			RoadActor->ZOffset_cm = 250.0f; // 2.5 м над рельефом
+			RoadActor->Terrain = Terrain;
 			RoadActor->LoadAndBuild(InProject.RoadsPath);
 		}
 	}
@@ -375,15 +374,14 @@ void ARailOptimaGameMode::OpenProject(const FRailProjectMetadata& InProject)
 		if (!RiverActor)
 		{
 			RiverActor = GetWorld()->SpawnActor<ARoadRenderer>(ARoadRenderer::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
-			if (RiverActor)
-			{
-				RiverActor->FeatureType = ERoadFeatureType::River;
-				RiverActor->RiverColor = FLinearColor(0.05f, 0.45f, 0.95f, 0.95f);
-				RiverActor->Terrain = Terrain;
-			}
 		}
 		if (RiverActor)
 		{
+			RiverActor->FeatureType = ERoadFeatureType::River;
+			RiverActor->Width_cm = 5500.0f; // 55 м широкое русло реки
+			RiverActor->ZOffset_cm = 200.0f; // 2 м над рельефом
+			RiverActor->RiverColor = FLinearColor(0.04f, 0.55f, 1.0f, 1.0f);
+			RiverActor->Terrain = Terrain;
 			RiverActor->LoadAndBuild(InProject.RiversPath);
 		}
 	}

@@ -120,6 +120,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "RailOptima|Waypoints")
 	const TArray<ARailEndpoint*>& GetWaypoints() const { return Waypoints; }
 
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Terrain")
+	AProceduralTerrain* GetTerrain() const { return Terrain; }
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Endpoints")
+	ARailEndpoint* GetStartEndpoint() const { return StartEndpoint; }
+
+	UFUNCTION(BlueprintPure, Category = "RailOptima|Endpoints")
+	ARailEndpoint* GetEndEndpoint() const { return EndEndpoint; }
+
 	// ─────────────────────────────────────────────────────────────────
 	//  Зоны и интерактивная кисть
 	// ─────────────────────────────────────────────────────────────────

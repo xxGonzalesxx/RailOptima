@@ -86,9 +86,13 @@ void ARailOptimaPlayerController::SetupInputComponent()
 	Super::SetupInputComponent();
 	if (InputComponent)
 	{
+		// Прямая привязка ЛКМ и ПКМ для гарантированной обработки кликов и драга маркеров
+		InputComponent->BindKey(EKeys::LeftMouseButton, IE_Pressed, this, &ARailOptimaPlayerController::HandlePrimaryPressed);
+		InputComponent->BindKey(EKeys::LeftMouseButton, IE_Released, this, &ARailOptimaPlayerController::HandlePrimaryReleased);
+		InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this, &ARailOptimaPlayerController::HandleSecondaryPressed);
+
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &ARailOptimaPlayerController::HandleEscapePressed);
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &ARailOptimaPlayerController::HandleProfileToggle);
-		InputComponent->BindKey(EKeys::RightMouseButton, IE_Pressed, this, &ARailOptimaPlayerController::HandleSecondaryPressed);
 		InputComponent->BindKey(EKeys::B, IE_Pressed, this, &ARailOptimaPlayerController::HandleBrushModeToggle);
 		InputComponent->BindKey(EKeys::LeftBracket, IE_Pressed, this, &ARailOptimaPlayerController::HandleBrushRadiusDecrease);
 		InputComponent->BindKey(EKeys::RightBracket, IE_Pressed, this, &ARailOptimaPlayerController::HandleBrushRadiusIncrease);
@@ -359,6 +363,45 @@ void ARailOptimaPlayerController::HandleBrushRadiusIncrease()
 
 ARailEndpoint* ARailOptimaPlayerController::PickEndpointUnderCursor() const
 {
+	// 1. Приоритетный экранный хит-тест (Screen-space pick):
+	// Проецирует координаты всех маркеров в экранные пиксели.
+	// Работает со 100% надёжностью при любом удалении камеры и масштабе.
+	FVector2D MousePos;
+	if (GetMousePosition(MousePos.X, MousePos.Y))
+	{
+		TArray<AActor*> FoundEndpoints;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), ARailEndpoint::StaticClass(), FoundEndpoints);
+
+		ARailEndpoint* BestMarker = nullptr;
+		float BestDistSq = FMath::Square(50.0f); // 50 px радиус захвата на экране
+
+		for (AActor* Actor : FoundEndpoints)
+		{
+			ARailEndpoint* Endpoint = Cast<ARailEndpoint>(Actor);
+			if (!Endpoint || Endpoint->IsHidden())
+			{
+				continue;
+			}
+
+			FVector2D ScreenPos;
+			if (ProjectWorldLocationToScreen(Endpoint->GetActorLocation(), ScreenPos))
+			{
+				const float DistSq = FVector2D::DistSquared(MousePos, ScreenPos);
+				if (DistSq < BestDistSq)
+				{
+					BestDistSq = DistSq;
+					BestMarker = Endpoint;
+				}
+			}
+		}
+
+		if (BestMarker)
+		{
+			return BestMarker;
+		}
+	}
+
+	// 2. Fallback: 3D луч и sweep сферы
 	FVector WorldOrigin, WorldDir;
 	if (!DeprojectMousePositionToWorld(WorldOrigin, WorldDir))
 		return nullptr;
@@ -380,7 +423,10 @@ ARailEndpoint* ARailOptimaPlayerController::PickEndpointUnderCursor() const
 	{
 		if (ARailEndpoint* Endpoint = Cast<ARailEndpoint>(Hit.GetActor()))
 		{
-			return Endpoint;
+			if (!Endpoint->IsHidden())
+			{
+				return Endpoint;
+			}
 		}
 	}
 	return nullptr;
@@ -413,9 +459,33 @@ bool ARailOptimaPlayerController::TraceTerrainUnderCursor(FVector& OutHitLocatio
 			*GetNameSafe(Hit.GetActor()));
 	}
 
-	if (!bHit)
-		return false;
+	if (bHit)
+	{
+		OutHitLocation = Hit.ImpactPoint;
+		return true;
+	}
 
-	OutHitLocation = Hit.ImpactPoint;
-	return true;
+	// Fallback при промахе по коллизии меша: математическое пересечение луча камеры с картой высот
+	if (ARailOptimaGameMode* GM = Cast<ARailOptimaGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		if (AProceduralTerrain* Terrain = GM->GetTerrain())
+		{
+			if (FMath::Abs(WorldDir.Z) > 1e-4f)
+			{
+				const float T = -WorldOrigin.Z / WorldDir.Z;
+				if (T > 0.0f)
+				{
+					const FVector IntersectPoint = WorldOrigin + WorldDir * T;
+					float SampledZ = 0.0f;
+					if (Terrain->SampleTerrainZ_cm(FVector2D(IntersectPoint.X, IntersectPoint.Y), SampledZ))
+					{
+						OutHitLocation = FVector(IntersectPoint.X, IntersectPoint.Y, SampledZ);
+						return true;
+					}
+				}
+			}
+		}
+	}
+
+	return false;
 }

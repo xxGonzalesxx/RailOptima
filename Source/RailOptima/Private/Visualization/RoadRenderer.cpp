@@ -39,11 +39,29 @@ ARoadRenderer::ARoadRenderer()
 
 	RiverColor = FLinearColor(0.04f, 0.48f, 0.98f, 1.0f);
 
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> MatFinder(
-		TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-	if (MatFinder.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> RoadMatFinder(
+		TEXT("/Game/RailOptima/Materials/M_RoadLine"));
+	if (RoadMatFinder.Succeeded())
 	{
-		RoadMaterial = MatFinder.Object;
+		RoadMaterial = RoadMatFinder.Object;
+	}
+	else
+	{
+		static ConstructorHelpers::FObjectFinder<UMaterialInterface> MarkerMatFinder(
+			TEXT("/Game/RailOptima/Materials/M_EndpointMarker"));
+		if (MarkerMatFinder.Succeeded())
+		{
+			RoadMaterial = MarkerMatFinder.Object;
+		}
+		else
+		{
+			static ConstructorHelpers::FObjectFinder<UMaterialInterface> FallbackMat(
+				TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+			if (FallbackMat.Succeeded())
+			{
+				RoadMaterial = FallbackMat.Object;
+			}
+		}
 	}
 }
 
@@ -243,12 +261,24 @@ bool ARoadRenderer::LoadAndBuild(const FString& InGeoJsonPath)
 	FlushSection();
 
 	UMaterialInstanceDynamic* DynMat = nullptr;
-	if (RoadMaterial)
+	UMaterialInterface* TargetMat = RoadMaterial;
+	if (FeatureType == ERoadFeatureType::River)
 	{
-		DynMat = UMaterialInstanceDynamic::Create(RoadMaterial, this);
+		static UMaterialInterface* RiverMatAsset = Cast<UMaterialInterface>(StaticLoadObject(UMaterialInterface::StaticClass(), nullptr, TEXT("/Game/RailOptima/Materials/M_RiverLine")));
+		if (RiverMatAsset)
+		{
+			TargetMat = RiverMatAsset;
+		}
+	}
+
+	if (TargetMat)
+	{
+		DynMat = UMaterialInstanceDynamic::Create(TargetMat, this);
 		if (DynMat)
 		{
 			DynMat->SetVectorParameterValue(TEXT("BaseColor"), Color);
+			DynMat->SetVectorParameterValue(TEXT("Color"), Color);
+			DynMat->SetScalarParameterValue(TEXT("EmissiveBoost"), 0.35f);
 		}
 	}
 

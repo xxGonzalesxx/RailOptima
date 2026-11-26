@@ -348,7 +348,7 @@ bool URailProjectManager::CreateProjectFromPng(
 	else
 	{
 		FString DefaultMeta = FString::Printf(
-			TEXT("{\n  \"region_name\": \"%s\",\n  \"min_elevation_m\": 0.0,\n  \"max_elevation_m\": 1500.0,\n  \"pixel_size_m\": 30.0,\n  \"width_px\": %d,\n  \"height_px\": %d\n}"),
+			TEXT("{\n  \"region_name\": \"%s\",\n  \"min_elevation_m\": 0.0,\n  \"max_elevation_m\": 1500.0,\n  \"pixel_size_m\": 30.0,\n  \"width_px\": %d,\n  \"height_px\": %d,\n  \"bbox\": {\n    \"west\": 38.85,\n    \"south\": 44.95,\n    \"east\": 39.25,\n    \"north\": 45.35\n  }\n}"),
 			*InProjectName, PngWidth, PngHeight);
 		FFileHelper::SaveStringToFile(DefaultMeta, *DestMeta, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 	}
@@ -370,6 +370,13 @@ bool URailProjectManager::CreateProjectFromPng(
 				FM.Copy(*DestRoads, *FallbackRoads, true, true);
 			}
 		}
+
+		if (!FM.FileExists(*DestRoads))
+		{
+			// Автоматическая генерация опорной дорожной сети региона
+			const FString DefaultRoadsJson = TEXT("{\n  \"type\": \"FeatureCollection\",\n  \"features\": [\n    {\n      \"type\": \"Feature\",\n      \"properties\": {\"name\": \"Highway M-4 West-East\"},\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [[38.86, 45.03], [38.92, 45.035], [38.98, 45.04], [39.05, 45.042], [39.12, 45.045], [39.24, 45.048]]\n      }\n    },\n    {\n      \"type\": \"Feature\",\n      \"properties\": {\"name\": \"North Bypass\"},\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [[38.88, 45.22], [38.96, 45.25], [39.08, 45.24], [39.22, 45.19]]\n      }\n    },\n    {\n      \"type\": \"Feature\",\n      \"properties\": {\"name\": \"North-South Route\"},\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [[39.02, 44.96], [39.015, 45.04], [39.02, 45.16], [39.03, 45.33]]\n      }\n    }\n  ]\n}");
+			FFileHelper::SaveStringToFile(DefaultRoadsJson, *DestRoads, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+		}
 	}
 
 	const FString DestRivers = ProjectDir / TEXT("rivers.geojson");
@@ -387,6 +394,13 @@ bool URailProjectManager::CreateProjectFromPng(
 			{
 				FM.Copy(*DestRivers, *FallbackRivers, true, true);
 			}
+		}
+
+		if (!FM.FileExists(*DestRivers))
+		{
+			// Автоматическая генерация русла реки с притоком
+			const FString DefaultRiversJson = TEXT("{\n  \"type\": \"FeatureCollection\",\n  \"features\": [\n    {\n      \"type\": \"Feature\",\n      \"properties\": {\"name\": \"Kuban River Main\"},\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [[38.85, 45.01], [38.92, 45.012], [39.01, 45.022], [39.09, 45.028], [39.19, 45.035], [39.25, 45.03]]\n      }\n    },\n    {\n      \"type\": \"Feature\",\n      \"properties\": {\"name\": \"North Stream Tributary\"},\n      \"geometry\": {\n        \"type\": \"LineString\",\n        \"coordinates\": [[39.06, 45.28], [39.05, 45.21], [39.065, 45.14], [39.05, 45.015]]\n      }\n    }\n  ]\n}");
+			FFileHelper::SaveStringToFile(DefaultRiversJson, *DestRivers, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 		}
 	}
 

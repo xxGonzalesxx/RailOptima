@@ -62,6 +62,8 @@ $RECYCLE.BIN/
 # Исходные данные (PNG, GeoTIFF, PBF, GeoJSON) не версионируем
 # через обычный git. При необходимости — через Git LFS.
 /RawContent/
+!/RawContent/roads.geojson
+!/RawContent/rivers.geojson
 /Content/RawContent/
 /Projects/*
 !Projects/.gitkeep
