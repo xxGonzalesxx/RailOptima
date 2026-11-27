@@ -11,7 +11,7 @@
   <img src="https://img.shields.io/badge/architecture-monorepo-6f42c1?style=for-the-badge" alt="Monorepo" />
   <img src="https://img.shields.io/badge/API-REST%20%2B%20OpenAPI-85ea2d?style=for-the-badge" alt="REST API and OpenAPI" />
   <img src="https://img.shields.io/badge/Java-25-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java 25" />
-  <img src="https://img.shields.io/badge/Quarkus-3.40.1.1-4695EB?style=for-the-badge&logo=quarkus&logoColor=white" alt="Quarkus 3.40.1.1" />
+  <img src="https://img.shields.io/badge/Quarkus-3.40.1.1-4695EB?style=for-the-badge&logo=quarkus&logoColor=white" alt="Quarkus 4.0.0" />
 </p>
 
 <p>
