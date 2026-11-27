@@ -43,7 +43,14 @@ public class AuthService {
                     }
 
                     return Uni.createFrom()
-                            .item(() -> BcryptUtil.bcryptHash(request.password(), 12))
+                            .item(() -> {
+                                char[] pwd = request.password().toCharArray();
+                                try {
+                                    return BcryptUtil.bcryptHash(pwd, 12);
+                                } finally {
+                                    java.util.Arrays.fill(pwd, '\0');
+                                }
+                            })
                             .chain(hashedPassword -> {
                                 User user = User.builder()
                                         .email(request.email())
@@ -79,10 +86,14 @@ public class AuthService {
                     User user = optionalUser.get();
 
                     return Uni.createFrom()
-                            .item(() -> BcryptUtil.matches(
-                                    request.password(),
-                                    user.getPassword()
-                            ))
+                            .item(() -> {
+                                char[] pwd = request.password().toCharArray();
+                                try {
+                                    return BcryptUtil.matches(pwd, user.getPassword());
+                                } finally {
+                                    java.util.Arrays.fill(pwd, '\0');
+                                }
+                            })
                             .chain(passwordMatches -> {
                                 if (!passwordMatches) {
                                     return Uni.createFrom().failure(

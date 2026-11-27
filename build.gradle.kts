@@ -1,12 +1,12 @@
 
 plugins {
     java
-    id("io.quarkus") version "3.40.1.1"
+    id("io.quarkus") version "4.0.1"
     id("io.freefair.lombok") version "9.8.3"
 }
 
 group = "com.railoptima"
-version = "0.1.0-SNAPSHOT"
+version = "1.0.1-SNAPSHOT"
 
 java {
     toolchain {
@@ -15,7 +15,7 @@ java {
 }
 
 dependencies {
-    implementation(enforcedPlatform("io.quarkus.platform:quarkus-bom:3.40.1.1"))
+    implementation(enforcedPlatform("io.quarkus.platform:quarkus-bom:4.0.1"))
 
     // REST API and validation
     implementation("io.quarkus:quarkus-rest")

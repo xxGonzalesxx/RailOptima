@@ -43,11 +43,6 @@ quarkus:
     locations: classpath:db/migration
     baseline-on-migrate: false
 
-  smallrye-health:
-    root-path: /q/health
-    ui:
-      enable: true
-
   log:
     category:
       "api":
