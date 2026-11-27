@@ -8,9 +8,13 @@
 #include "Misc/Paths.h"
 
 // libxlsxwriter — C-библиотека, поэтому отключаем строгие правила UE на время include.
+#if RAIL_WITH_XLSX
+
 THIRD_PARTY_INCLUDES_START
 #include "xlsxwriter.h"
 THIRD_PARTY_INCLUDES_END
+
+
 
 // ─────────────────────────────────────────────────────────────────
 //  Команды навигации
@@ -155,3 +159,13 @@ FString UExcelExporter::NormalizeFilePath(const FString& InFilePath) const
 
 	return FPaths::ConvertRelativePathToFull(Path);
 }
+
+#else // RAIL_WITH_XLSX == 0 (Linux)
+
+bool UExcelExporter::ExportReport(const FRailRouteReport& Report, const FString& OutPath)
+{
+    UE_LOG(LogTemp, Warning, TEXT("Excel export is not supported on this platform"));
+    return false;
+}
+
+#endif

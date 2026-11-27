@@ -5,6 +5,8 @@
 #include "GameFramework/GameUserSettings.h"
 #include "Engine/Engine.h"
 #include "Misc/ConfigCacheIni.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 void URailSettingsManager::InitializeSettings(bool bForceBenchmark)
 {
@@ -22,8 +24,17 @@ void URailSettingsManager::InitializeSettings(bool bForceBenchmark)
 	if (!bBenchmarkDone || bForceBenchmark)
 	{
 		UE_LOG(LogTemp, Log, TEXT("[RailSettings] Автонастройка: запуск бенчмарка оборудования..."));
-		Settings->RunHardwareBenchmark(10, 1.0f, 1.0f);
-		Settings->ApplyHardwareBenchmarkResults();
+				if (PLATFORM_LINUX || FParse::Param(FCommandLine::Get(), TEXT("NoAutoBench")))
+		{
+			// GPU-бенчмарк на Linux/Vulkan вешает драйвер NVIDIA (Xid 109) — пропускаем, берём Low.
+			UE_LOG(LogTemp, Warning, TEXT("[RailSettings] Бенчмарк пропущен, применяется пресет Low"));
+			Settings->SetOverallScalabilityLevel(0);
+		}
+		else
+		{
+			Settings->RunHardwareBenchmark(10, 1.0f, 1.0f);
+			Settings->ApplyHardwareBenchmarkResults();
+		}
 
 		const int32 Overall = Settings->GetOverallScalabilityLevel();
 		UE_LOG(LogTemp, Log, TEXT("[RailSettings] Результат бенчмарка: уровень масштабирования = %d"), Overall);

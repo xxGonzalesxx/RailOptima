@@ -72,4 +72,4 @@ $RECYCLE.BIN/
 /Scripts/cache/
 
 # Локальный .env с API-ключом
-/Scripts/.env
+/Scripts/.envScripts/.env
